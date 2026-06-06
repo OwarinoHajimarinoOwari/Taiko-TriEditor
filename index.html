@@ -7,211 +7,79 @@
     <title>TJAエディター</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/encoding-japanese/2.0.0/encoding.min.js"></script>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap"
-        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: 'Inter', 'Noto Sans JP', sans-serif;
-            background-color: #f0f2f5;
-        }
+        body { font-family: 'Inter', 'Noto Sans JP', sans-serif; background-color: #f0f2f5; }
+        
+        .hit-circle { position: absolute; left: 145px; top: 50%; width: 60px; height: 60px; border: 2px solid #808080; border-radius: 50%; box-shadow: none; z-index: 15; transform: translateY(-50%); background-color: transparent; display: flex; justify-content: center; align-items: center; pointer-events: none; }
+        .hit-circle-small { width: 40px; height: 40px; border: 2px solid #808080; border-radius: 50%; background-color: transparent; }
+        
+        #preview-container { position: relative; overflow: hidden; background: linear-gradient(to right, #6b7280, #4b5563); border-top: 4px solid #374151; height: 80px; }
+        #preview-container:focus { outline: none; }
+        #preview-container.gogo-time { background: #FF4500; }
+        
+        .lane { position: absolute; top: 0; bottom: 0; height: auto; left: 0; right: 0; background-color: rgba(0, 0, 0, 0.2); border-top: 2px solid rgba(255, 255, 255, 0.3); border-bottom: 2px solid rgba(255, 255, 255, 0.3); z-index: 10; }
+        
+        #judge-display { position: absolute; left: 120px; top: 30%; transform: translateX(-50%); z-index: 40; text-shadow: 2px 2px 4px #000; pointer-events: none; }
+        .judge-item { position: absolute; transform: translateX(-50%); text-shadow: 2px 2px 4px #000; font-size: 1.875rem; font-weight: 700; white-space: nowrap; animation: judgeAnim 0.2s ease-out forwards; }
+        @keyframes judgeAnim { from { transform: translateX(-50%) translateY(-20px); opacity: 1; } to { transform: translateX(-50%) translateY(0); opacity: 1; } }
+        
+        #roll-count-display { position: absolute; left: 175px; top: 30%; transform: translateX(-50%); z-index: 40; color: white; font-size: 1.875rem; font-weight: 700; text-shadow: 2px 2px 4px #000; opacity: 0; transition: opacity 0.1s; pointer-events: none; }
+        #combo-display { position: absolute; left: 70px; top: 50%; transform: translateX(-50%) translateY(-50%); z-index: 40; font-size: 2.25rem; font-weight: 700; text-shadow: 2px 2px 4px #000; color: white; opacity: 0; transition: opacity 0.1s, color 0.1s; text-align: center; white-space: nowrap; pointer-events: none; }
+        
+        #measure-display { position: absolute; left: 175px; top: 50%; transform: translate(-50%, -50%) translateY(-30px); z-index: 40; font-size: 0.85rem; font-weight: 600; text-shadow: 1px 1px 3px #000; color: rgba(255, 255, 255, 0.9); text-align: center; white-space: nowrap; background-color: rgba(0, 0, 0, 0.4); padding: 2px 6px; border-radius: 4px; cursor: text; transition: background-color 0.2s; outline: none; min-width: 40px; }
+        #measure-display:hover, #measure-display:focus { background-color: rgba(0, 0, 0, 0.8); }
+        
+        .hit-effect-base { position: absolute; top: 50%; transform: translateY(-50%); opacity: 0; transition: opacity 0.2s ease-out; z-index: 35; pointer-events: none; }
+        .hit-effect-base.effect-fade { opacity: 1; transition-duration: 0s; }
+        #don-effect-left { left: 45px; width: 50px; height: 50px; clip-path: polygon(0% 0%, 50% 0%, 50% 100%, 0% 100%); }
+        #don-effect-right { left: 45px; width: 50px; height: 50px; clip-path: polygon(50% 0%, 100% 0%, 100% 100%, 50% 100%); }
+        #ka-effect-left { left: 35px; width: 70px; height: 70px; clip-path: polygon(0% 0%, 50% 0%, 50% 100%, 0% 100%); }
+        #ka-effect-right { left: 35px; width: 70px; height: 70px; clip-path: polygon(50% 0%, 100% 0%, 100% 100%, 50% 100%); }
 
-        .hit-circle {
-            position: absolute;
-            left: 145px;
-            top: 50%;
-            width: 60px;
-            height: 60px;
-            border: 4px solid rgba(0, 0, 0, 0.7);
-            border-radius: 50%;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-            z-index: 10;
-            transform: translateY(-50%);
-            background-color: rgba(255, 255, 255, 0.3);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
+        .dropdown-menu { display: none; position: absolute; right: 0; background-color: white; border: 1px solid #ddd; border-radius: 0.5rem; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); z-index: 50; }
+        .dropdown-menu a { color: black; padding: 10px 15px; text-decoration: none; display: block; white-space: nowrap; }
+        .dropdown-menu a:hover { background-color: #f1f1f1; }
 
-        .hit-circle-small {
-            width: 40px;
-            height: 40px;
-            border: 3px solid rgba(0, 0, 0, 0.5);
-            border-radius: 50%;
+        /* エディターとGutterのレイアウト */
+        #editor-container { flex: 1; display: flex; overflow: hidden; position: relative; background-color: #111827; }
+        
+        #editor-gutter {
+            width: 48px;
+            background-color: #1f2937;
+            color: #9ca3af;
+            text-align: right;
+            padding: 1rem 8px 1rem 0;
+            font-family: monospace;
+            font-size: 14px;
+            line-height: 1.5rem; 
+            overflow-y: hidden;
+            user-select: none;
+            border-right: 1px solid #374151;
+        }
+        
+        .gutter-line { cursor: pointer; height: 1.5rem; }
+        .gutter-line:hover { color: #ffffff; background-color: #374151; font-weight: bold; }
+        
+        #tjaEditor {
+            flex: 1;
+            padding: 1rem;
+            font-family: monospace;
+            font-size: 14px;
+            line-height: 1.5rem; 
             background-color: transparent;
-        }
-
-        #preview-container {
-            position: relative;
-            overflow: hidden;
-            background: linear-gradient(to right, #6b7280, #4b5563);
-            border-top: 4px solid #374151;
-            height: 80px;
-        }
-
-        #preview-container:focus {
+            color: #4ade80;
             outline: none;
+            resize: none;
+            white-space: pre; 
+            overflow-wrap: normal;
+            overflow-x: auto;
         }
 
-        .lane {
-            position: absolute;
-            top: 0;
-            bottom: 0;
-            height: auto;
-            left: 0;
-            right: 0;
-            background-color: rgba(0, 0, 0, 0.2);
-            border-top: 2px solid rgba(255, 255, 255, 0.3);
-            border-bottom: 2px solid rgba(255, 255, 255, 0.3);
-        }
-
-        #preview-container.gogo-time {
-            background: #FF4500;
-        }
-
-        #judge-display {
-            position: absolute;
-            left: 120px;
-            top: 30%;
-            transform: translateX(-50%);
-            z-index: 21;
-            text-shadow: 2px 2px 4px #000;
-            pointer-events: none;
-        }
-
-        .judge-item {
-            position: absolute;
-            transform: translateX(-50%);
-            text-shadow: 2px 2px 4px #000;
-            font-size: 1.875rem;
-            font-weight: 700;
-            white-space: nowrap;
-            animation: judgeAnim 0.2s ease-out forwards;
-        }
-
-        @keyframes judgeAnim {
-            from {
-                transform: translateX(-50%) translateY(-20px);
-                opacity: 1;
-            }
-
-            to {
-                transform: translateX(-50%) translateY(0);
-                opacity: 1;
-            }
-        }
-
-        #roll-count-display {
-            position: absolute;
-            left: 175px;
-            top: 30%;
-            transform: translateX(-50%);
-            z-index: 22;
-            color: white;
-            font-size: 1.875rem;
-            font-weight: 700;
-            text-shadow: 2px 2px 4px #000;
-            opacity: 0;
-            transition: opacity 0.1s;
-        }
-
-        #combo-display {
-            position: absolute;
-            left: 70px;
-            top: 50%;
-            transform: translateX(-50%) translateY(-50%);
-            z-index: 22;
-            font-size: 2.25rem;
-            font-weight: 700;
-            text-shadow: 2px 2px 4px #000;
-            color: white;
-            opacity: 0;
-            transition: opacity 0.1s, color 0.1s;
-            text-align: center;
-            width: auto;
-            white-space: nowrap;
-        }
-
-        #measure-display {
-            position: absolute;
-            left: 175px;
-            top: 50%;
-            transform: translate(-50%, -50%) translateY(-30px);
-            z-index: 23;
-            font-size: 0.75rem;
-            font-weight: 600;
-            text-shadow: 1px 1px 3px #000;
-            color: rgba(255, 255, 255, 0.9);
-            text-align: center;
-            white-space: nowrap;
-            background-color: rgba(0, 0, 0, 0.3);
-            padding: 2px 6px;
-            border-radius: 4px;
-        }
-
-        .hit-effect-base {
-            position: absolute;
-            top: 50%;
-            transform: translateY(-50%);
-            opacity: 0;
-            transition: opacity 0.2s ease-out;
-            z-index: 5;
-        }
-
-        .hit-effect-base.effect-fade {
-            opacity: 1;
-            transition-duration: 0s;
-        }
-
-        #don-effect-left {
-            left: 45px;
-            width: 50px;
-            height: 50px;
-            clip-path: polygon(0% 0%, 50% 0%, 50% 100%, 0% 100%);
-        }
-
-        #don-effect-right {
-            left: 45px;
-            width: 50px;
-            height: 50px;
-            clip-path: polygon(50% 0%, 100% 0%, 100% 100%, 50% 100%);
-        }
-
-        #ka-effect-left {
-            left: 35px;
-            width: 70px;
-            height: 70px;
-            clip-path: polygon(0% 0%, 50% 0%, 50% 100%, 0% 100%);
-        }
-
-        #ka-effect-right {
-            left: 35px;
-            width: 70px;
-            height: 70px;
-            clip-path: polygon(50% 0%, 100% 0%, 100% 100%, 50% 100%);
-        }
-
-        .dropdown-menu {
-            display: none;
-            position: absolute;
-            right: 0;
-            background-color: white;
-            border: 1px solid #ddd;
-            border-radius: 0.5rem;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            z-index: 50;
-        }
-
-        .dropdown-menu a {
-            color: black;
-            padding: 10px 15px;
-            text-decoration: none;
-            display: block;
-            white-space: nowrap;
-        }
-
-        .dropdown-menu a:hover {
-            background-color: #f1f1f1;
+        #cursor-position-display {
+            position: absolute; bottom: 10px; right: 25px;
+            background-color: rgba(31, 41, 55, 0.85); color: #d1d5db;
+            font-size: 12px; padding: 4px 8px; border-radius: 4px; pointer-events: none; z-index: 10;
         }
     </style>
 </head>
@@ -222,45 +90,38 @@
             <h1 class="text-xl font-bold">TJAエディター</h1>
             <div class="text-sm"> <span id="musicFileName">楽曲: 未選択</span> </div>
             <div class="flex items-center space-x-2">
-                <div id="autoStatus" class="px-3 py-2 text-white font-bold rounded-lg"
-                    style="display: none; background-color: #33aadd;">AUTO</div>
-                <select id="courseSelect"
-                    class="px-2 py-2 bg-gray-700 text-white font-semibold rounded-lg shadow transition-colors duration-200"
-                    style="outline: none;"></select>
+                <div id="autoStatus" class="px-3 py-2 text-white font-bold rounded-lg" style="display: none; background-color: #33aadd;">AUTO</div>
+                <select id="courseSelect" class="px-2 py-2 bg-gray-700 text-white font-semibold rounded-lg shadow transition-colors duration-200" style="outline: none;"></select>
 
                 <div class="relative">
-                    <button id="importDropdownButton"
-                        class="px-3 py-2 bg-indigo-500 hover:bg-indigo-600 text-white font-semibold rounded-lg shadow transition-colors duration-200">インポート</button>
+                    <button id="importDropdownButton" class="px-3 py-2 bg-indigo-500 hover:bg-indigo-600 text-white font-semibold rounded-lg shadow transition-colors duration-200">インポート</button>
                     <div id="importDropdownMenu" class="dropdown-menu">
                         <a href="#" id="uploadTjaButton">譜面 (.tja)</a>
                         <a href="#" id="uploadMusicButton">楽曲 (mp3, ogg, wav)</a>
                     </div>
                 </div>
                 <div class="relative">
-                    <button id="exportDropdownButton"
-                        class="px-3 py-2 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg shadow transition-colors duration-200">エクスポート</button>
+                    <button id="exportDropdownButton" class="px-3 py-2 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg shadow transition-colors duration-200">エクスポート</button>
                     <div id="exportDropdownMenu" class="dropdown-menu">
                         <a href="#" id="exportTjaButton">譜面 (.tja)</a>
                         <a href="#" id="exportMusicButton">楽曲</a>
                     </div>
                 </div>
 
-                <button id="playButton"
-                    class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg shadow transition-colors duration-200">再生</button>
-                <button id="settingsButton"
-                    class="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white font-semibold rounded-lg shadow transition-colors duration-200">設定</button>
+                <button id="playButton" class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg shadow transition-colors duration-200">再生</button>
+                <button id="settingsButton" class="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white font-semibold rounded-lg shadow transition-colors duration-200">設定</button>
             </div>
         </div>
+        
         <input type="file" id="tjaFileInput" accept=".tja" class="hidden">
         <input type="file" id="musicFileInput" accept=".mp3,.wav,.ogg" class="hidden">
         <input type="file" id="donSeInput" accept=".mp3,.wav,.ogg" class="hidden">
         <input type="file" id="kaSeInput" accept=".mp3,.wav,.ogg" class="hidden">
         <input type="file" id="balloonSeInput" accept=".mp3,.wav,.ogg" class="hidden">
 
-        <textarea id="tjaEditor"
-            class="flex-1 w-full p-4 font-mono text-sm bg-gray-900 text-green-400 outline-none resize-none"
-            spellcheck="false">
-TITLE:可変長・新命令テスト
+        <div id="editor-container">
+            <div id="editor-gutter"></div>
+            <textarea id="tjaEditor" spellcheck="false">TITLE:可変長・新命令テスト
 SUBTITLE:BPM/SCROLL/DELAY/複素数 // ここはコメントです
 BPM:120
 WAVE:sample.mp3
@@ -291,7 +152,6 @@ BALLOON:10
 #JPOSSCROLL 1 473 0
 #SCROLL 0.5+0.5i
 11111111,
-#JPOSSCROLL 2 946 1
 #SCROLL 1.0
 #GOGOSTART
 50008,
@@ -299,40 +159,32 @@ BALLOON:10
 70008,
 #GOGOEND
 1000,
-#END
-        </textarea>
+#END</textarea>
+            <div id="cursor-position-display">行: 1, 列: 0</div>
+        </div>
     </div>
 
     <div id="preview-container" class="w-full relative" tabindex="0">
         <div class="lane"></div>
-        <div class="hit-circle">
-            <div class="hit-circle-small"></div>
-        </div>
-        <div id="don-effect-left" class="hit-effect-base">
-            <div style="width: 50px; height: 50px; background-color: rgba(244, 67, 54, 0.8); border-radius: 50%;"></div>
-        </div>
-        <div id="don-effect-right" class="hit-effect-base">
-            <div style="width: 50px; height: 50px; background-color: rgba(244, 67, 54, 0.8); border-radius: 50%;"></div>
-        </div>
-        <div id="ka-effect-left" class="hit-effect-base">
-            <div
-                style="width: 70px; height: 70px; border: 10px solid rgba(33, 150, 243, 0.8); border-radius: 50%; box-sizing: border-box;">
-            </div>
-        </div>
-        <div id="ka-effect-right" class="hit-effect-base">
-            <div
-                style="width: 70px; height: 70px; border: 10px solid rgba(33, 150, 243, 0.8); border-radius: 50%; box-sizing: border-box;">
-            </div>
-        </div>
-        <div id="judge-display" class="text-white text-3xl font-bold" style="z-index: 21;"></div>
-        <div id="roll-count-display" style="z-index: 22;"></div>
-        <div id="combo-display" style="z-index: 21;"></div>
-        <div id="measure-display" style="z-index: 23;"></div>
-        <canvas id="previewCanvas" class="w-full h-full absolute top-0 left-0" style="z-index: 20;"></canvas>
+        <!-- 判定枠 (z-index 15) -->
+        <div class="hit-circle"><div class="hit-circle-small"></div></div>
+        
+        <!-- キャンバス (ノーツ、小節線、波形用 z-index: 20) -->
+        <canvas id="previewCanvas" class="w-full h-full absolute top-0 left-0" style="z-index: 20; pointer-events: none;"></canvas>
+        
+        <!-- エフェクト、コンボ表示など (z-index: 35~40) -->
+        <div id="don-effect-left" class="hit-effect-base"><div style="width: 50px; height: 50px; background-color: rgba(244, 67, 54, 0.8); border-radius: 50%;"></div></div>
+        <div id="don-effect-right" class="hit-effect-base"><div style="width: 50px; height: 50px; background-color: rgba(244, 67, 54, 0.8); border-radius: 50%;"></div></div>
+        <div id="ka-effect-left" class="hit-effect-base"><div style="width: 70px; height: 70px; border: 10px solid rgba(33, 150, 243, 0.8); border-radius: 50%; box-sizing: border-box;"></div></div>
+        <div id="ka-effect-right" class="hit-effect-base"><div style="width: 70px; height: 70px; border: 10px solid rgba(33, 150, 243, 0.8); border-radius: 50%; box-sizing: border-box;"></div></div>
+        
+        <div id="judge-display" class="text-white text-3xl font-bold"></div>
+        <div id="roll-count-display"></div>
+        <div id="combo-display"></div>
+        <div id="measure-display" title="クリックして数値を直接入力しEnterで移動"></div>
     </div>
 
-    <div id="settingsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center"
-        style="display: none; z-index: 100;">
+    <div id="settingsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center" style="display: none; z-index: 100;">
         <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg text-gray-800 max-h-[90vh] overflow-y-auto">
             <h2 class="text-2xl font-bold mb-6">設定</h2>
             <div class="space-y-6">
@@ -347,177 +199,110 @@ BALLOON:10
                 </fieldset>
 
                 <fieldset class="border p-4 rounded-md">
-                    <legend class="px-2 font-semibold">再生・パフォーマンス</legend>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div><label for="playbackSpeedSetting" class="block mb-1">再生速度 (倍率)</label><input type="number"
-                                id="playbackSpeedSetting" value="1.0" step="0.05" min="0.1" max="5.0"
-                                class="w-full p-2 border rounded-md"></div>
-                        <div><label for="renderFpsSetting" class="block mb-1">描画FPS</label><input type="number"
-                                id="renderFpsSetting" value="60" step="1" min="10" class="w-full p-2 border rounded-md">
+                    <legend class="px-2 font-semibold">表示機能（拡張）</legend>
+                    <div class="space-y-3">
+                        <label class="flex items-center space-x-3 cursor-pointer">
+                            <input type="checkbox" id="isFixedBpmEnabledSetting" class="h-5 w-5">
+                            <span class="text-sm font-semibold">見た目BPM固定 (Alt+ホイールで直感操作可)</span>
+                        </label>
+                        <div>
+                            <label for="fixedBpmValueSetting" class="block mb-1 text-sm">固定BPM値</label>
+                            <input type="number" id="fixedBpmValueSetting" value="200" step="10" min="10" class="w-full p-2 border rounded-md">
                         </div>
-                        <div><label for="autoRollSpeedSetting" class="block mb-1">オート連打速度 (打/秒)</label><input
-                                type="number" id="autoRollSpeedSetting" value="60" step="1" min="1"
-                                class="w-full p-2 border rounded-md"></div>
+                        <label class="flex items-center space-x-3 cursor-pointer mt-2">
+                            <input type="checkbox" id="isWaveformEnabledSetting" class="h-5 w-5">
+                            <span class="text-sm font-semibold">波形表示 (強制BPM固定適用)</span>
+                        </label>
+                        <label class="flex items-center space-x-3 cursor-pointer mt-2">
+                            <input type="checkbox" id="showGridLinesSetting" class="h-5 w-5" checked>
+                            <span class="text-sm font-semibold">音符グリッド線を表示</span>
+                        </label>
                     </div>
                 </fieldset>
 
                 <fieldset class="border p-4 rounded-md">
-                    <legend class="px-2 font-semibold">音量設定</legend>
+                    <legend class="px-2 font-semibold">再生・パフォーマンス</legend>
                     <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label for="musicVolumeSetting" class="block mb-1">楽曲音量 (0-100)</label>
-                            <input type="range" id="musicVolumeSetting" value="100" min="0" max="100" class="w-full">
-                        </div>
-                        <div>
-                            <label for="seVolumeSetting" class="block mb-1">SE音量 (0-100)</label>
-                            <input type="range" id="seVolumeSetting" value="100" min="0" max="100" class="w-full">
-                        </div>
+                        <div><label for="playbackSpeedSetting" class="block mb-1">再生速度 (倍率)</label><input type="number" id="playbackSpeedSetting" value="1.0" step="0.05" min="0.1" max="5.0" class="w-full p-2 border rounded-md"></div>
+                        <div><label for="renderFpsSetting" class="block mb-1">内部処理FPS (打音分解能)</label><input type="number" id="renderFpsSetting" value="240" step="1" min="30" class="w-full p-2 border rounded-md"></div>
+                        <div><label for="autoRollSpeedSetting" class="block mb-1">オート連打速度 (打/秒)</label><input type="number" id="autoRollSpeedSetting" value="60" step="1" min="1" class="w-full p-2 border rounded-md"></div>
                     </div>
                 </fieldset>
 
                 <fieldset class="border p-4 rounded-md">
                     <legend class="px-2 font-semibold">表示・出力設定</legend>
                     <div class="grid grid-cols-2 gap-4">
-                        <div><label for="editorFontSizeSetting" class="block mb-1">エディタ文字サイズ (px)</label><input
-                                type="number" id="editorFontSizeSetting" value="14" step="1" min="8" max="32"
-                                class="w-full p-2 border rounded-md"></div>
-                        <div><label for="exportEncodingSetting" class="block mb-1">エクスポート文字コード</label>
+                        <div><label for="editorFontSizeSetting" class="block mb-1">エディタ文字サイズ (px)</label><input type="number" id="editorFontSizeSetting" value="14" step="1" min="8" max="32" class="w-full p-2 border rounded-md"></div>
+                        <div><label for="exportEncodingSetting" class="block mb-1">出力文字コード</label>
                             <select id="exportEncodingSetting" class="w-full p-2 border rounded-md">
                                 <option value="SJIS">Shift_JIS (推奨)</option>
                                 <option value="UTF8">UTF-8</option>
                             </select>
                         </div>
-                        <div><label for="scrollSpeedSetting" class="block mb-1">全体スクロール倍率</label><input type="number"
-                                id="scrollSpeedSetting" value="1.0" step="0.1" min="0.1"
-                                class="w-full p-2 border rounded-md"></div>
-                        <div><label for="editorBgColorSetting" class="block mb-1">エディタ背景色</label><input type="color"
-                                id="editorBgColorSetting" value="#111827" class="w-full p-1 h-10 border rounded-md">
-                        </div>
-                        <div><label for="editorFgColorSetting" class="block mb-1">エディタ文字色</label><input type="color"
-                                id="editorFgColorSetting" value="#22c55e" class="w-full p-1 h-10 border rounded-md">
-                        </div>
+                        <div><label for="scrollSpeedSetting" class="block mb-1">全体スクロール倍率</label><input type="number" id="scrollSpeedSetting" value="1.0" step="0.1" min="0.1" class="w-full p-2 border rounded-md"></div>
+                        <div><label for="editorBgColorSetting" class="block mb-1">エディタ背景色</label><input type="color" id="editorBgColorSetting" value="#111827" class="w-full p-1 h-10 border rounded-md"></div>
+                        <div><label for="editorFgColorSetting" class="block mb-1">エディタ文字色</label><input type="color" id="editorFgColorSetting" value="#4ade80" class="w-full p-1 h-10 border rounded-md"></div>
+                    </div>
+                </fieldset>
+
+                <fieldset class="border p-4 rounded-md">
+                    <legend class="px-2 font-semibold">音量設定</legend>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div><label for="musicVolumeSetting" class="block mb-1">楽曲音量 (0-100)</label><input type="range" id="musicVolumeSetting" value="100" min="0" max="100" class="w-full"></div>
+                        <div><label for="seVolumeSetting" class="block mb-1">SE音量 (0-100)</label><input type="range" id="seVolumeSetting" value="100" min="0" max="100" class="w-full"></div>
                     </div>
                 </fieldset>
 
                 <fieldset class="border p-4 rounded-md">
                     <legend class="px-2 font-semibold">キー設定</legend>
                     <div class="grid grid-cols-2 gap-4">
-                        <div><label for="keyDonL" class="block mb-1">ドン (左)</label><input type="text" id="keyDonL"
-                                class="w-full p-2 border rounded-md uppercase"></div>
-                        <div><label for="keyDonR" class="block mb-1">ドン (右)</label><input type="text" id="keyDonR"
-                                class="w-full p-2 border rounded-md uppercase"></div>
-                        <div><label for="keyKaL" class="block mb-1">カッ (左)</label><input type="text" id="keyKaL"
-                                class="w-full p-2 border rounded-md uppercase"></div>
-                        <div><label for="keyKaR" class="block mb-1">カッ (右)</label><input type="text" id="keyKaR"
-                                class="w-full p-2 border rounded-md uppercase"></div>
+                        <div><label for="keyDonL" class="block mb-1">ドン (左)</label><input type="text" id="keyDonL" class="w-full p-2 border rounded-md uppercase"></div>
+                        <div><label for="keyDonR" class="block mb-1">ドン (右)</label><input type="text" id="keyDonR" class="w-full p-2 border rounded-md uppercase"></div>
+                        <div><label for="keyKaL" class="block mb-1">カッ (左)</label><input type="text" id="keyKaL" class="w-full p-2 border rounded-md uppercase"></div>
+                        <div><label for="keyKaR" class="block mb-1">カッ (右)</label><input type="text" id="keyKaR" class="w-full p-2 border rounded-md uppercase"></div>
                     </div>
                 </fieldset>
-
+                
                 <fieldset class="border p-4 rounded-md">
                     <legend class="px-2 font-semibold">効果音 (SE) 管理</legend>
                     <div class="grid grid-cols-2 gap-2 items-center">
-                        <div class="flex items-center justify-between border p-2 rounded">
-                            <span class="font-medium mr-2">ドン</span>
-                            <div>
-                                <button
-                                    class="se-import-button text-xs py-1 px-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-                                    data-se-key="don">インポート</button>
-                                <button
-                                    class="se-export-button text-xs py-1 px-2 bg-green-500 text-white rounded hover:bg-green-600"
-                                    data-se-key="don">保存</button>
-                            </div>
-                        </div>
-                        <div class="flex items-center justify-between border p-2 rounded">
-                            <span class="font-medium mr-2">カッ</span>
-                            <div>
-                                <button
-                                    class="se-import-button text-xs py-1 px-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-                                    data-se-key="ka">インポート</button>
-                                <button
-                                    class="se-export-button text-xs py-1 px-2 bg-green-500 text-white rounded hover:bg-green-600"
-                                    data-se-key="ka">保存</button>
-                            </div>
-                        </div>
-                        <div class="flex items-center justify-between border p-2 rounded">
-                            <span class="font-medium mr-2">風船</span>
-                            <div>
-                                <button
-                                    class="se-import-button text-xs py-1 px-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-                                    data-se-key="balloon">インポート</button>
-                                <button
-                                    class="se-export-button text-xs py-1 px-2 bg-green-500 text-white rounded hover:bg-green-600"
-                                    data-se-key="balloon">保存</button>
-                            </div>
-                        </div>
+                        <div class="flex items-center justify-between border p-2 rounded"><span class="font-medium mr-2">ドン</span><div><button class="se-import-button text-xs py-1 px-2 bg-blue-500 text-white rounded hover:bg-blue-600" data-se-key="don">読込</button><button class="se-export-button text-xs py-1 px-2 bg-green-500 text-white rounded hover:bg-green-600" data-se-key="don">保存</button></div></div>
+                        <div class="flex items-center justify-between border p-2 rounded"><span class="font-medium mr-2">カッ</span><div><button class="se-import-button text-xs py-1 px-2 bg-blue-500 text-white rounded hover:bg-blue-600" data-se-key="ka">読込</button><button class="se-export-button text-xs py-1 px-2 bg-green-500 text-white rounded hover:bg-green-600" data-se-key="ka">保存</button></div></div>
+                        <div class="flex items-center justify-between border p-2 rounded"><span class="font-medium mr-2">風船</span><div><button class="se-import-button text-xs py-1 px-2 bg-blue-500 text-white rounded hover:bg-blue-600" data-se-key="balloon">読込</button><button class="se-export-button text-xs py-1 px-2 bg-green-500 text-white rounded hover:bg-green-600" data-se-key="balloon">保存</button></div></div>
                     </div>
                 </fieldset>
             </div>
             <div class="mt-8 flex justify-between items-center">
-                <button id="showHelpButton"
-                    class="text-sm text-blue-600 hover:underline font-semibold">操作方法・仕様を確認</button>
+                <button id="showHelpButton" class="text-sm text-blue-600 hover:underline font-semibold">操作方法・仕様を確認</button>
                 <div class="flex space-x-3">
-                    <button id="saveSettingsButton"
-                        class="px-5 py-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg">保存して閉じる</button>
-                    <button id="closeSettingsButton"
-                        class="px-5 py-2 bg-gray-300 hover:bg-gray-400 text-black font-semibold rounded-lg">キャンセル</button>
+                    <button id="saveSettingsButton" class="px-5 py-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg">保存して閉じる</button>
+                    <button id="closeSettingsButton" class="px-5 py-2 bg-gray-300 hover:bg-gray-400 text-black font-semibold rounded-lg">キャンセル</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <div id="helpModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center"
-        style="display: none; z-index: 110;">
+    <!-- Help modal -->
+    <div id="helpModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center" style="display: none; z-index: 110;">
         <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto text-gray-800">
             <h2 class="text-2xl font-bold mb-4">操作方法と仕様</h2>
             <div class="space-y-6">
-                <div>
-                    <h3 class="text-lg font-semibold mb-2 border-b pb-1">基本操作</h3>
-                    <pre class="bg-gray-100 p-4 rounded font-mono text-sm whitespace-pre-wrap">・譜面/楽曲のインポート: 右上の「インポート」メニューからファイルを選択します。
-・譜面/楽曲のエクスポート: 右上の「エクスポート」メニューから保存します。
-・再生/停止: [Space]キー または 再生/停止ボタン
-・オートプレイ切替: [Alt] + [A]
-・演奏レーンにフォーカス: [Alt]キー または レーンをクリック</pre>
-                </div>
-                <div>
-                    <h3 class="text-lg font-semibold mb-2 border-b pb-1">再生中の操作</h3>
-                    <pre
-                        class="bg-gray-100 p-4 rounded font-mono text-sm whitespace-pre-wrap">・演奏: 設定されたキー（デフォルト: F, J, D, K）</pre>
-                </div>
-                <div>
-                    <h3 class="text-lg font-semibold mb-2 border-b pb-1">停止中の操作</h3>
-                    <pre class="bg-gray-100 p-4 rounded font-mono text-sm whitespace-pre-wrap">・1小節進む/戻る: [→] / [←] キー (長押し対応)
-・先頭の小節へ移動: [↓] キー
-・最後の小節へ移動: [↑] キー</pre>
-                </div>
-                <div>
-                    <h3 class="text-lg font-semibold mb-2 border-b pb-1">仕様</h3>
-                    <ul class="list-disc list-inside text-sm space-y-2 bg-gray-100 p-4 rounded">
-                        <li>譜面ファイルはShift-JISまたはUTF-8として自動判別で読み込まれます。エクスポート時の文字コードは設定画面で変更可能です。</li>
-                        <li>TJA譜面と楽曲は自動的にブラウザに保存され、次回起動時に復元されます。</li>
-                        <li>行内で <code>//</code> が出現した場合、それ以降の文字列はコメントとして無視されます。</li>
-                        <li>キー設定では複数のキーをカンマ区切りで設定できます。(例: F,D)</li>
-                        <li>効果音(SE)は設定画面からインポートでき、次回以降も自動で読み込まれます。（ブラウザのデータ削除でリセットされます）</li>
-                        <li><code>#SCROLL</code> の値に <code>1+2i</code> のように虚数を指定すると、音符が縦にもスクロールします。</li>
-                        <li><code>#JPOSSCROLL [duration] [distance] [dir]</code> で判定枠を移動できます。<ul
-                                class="list-['-_'] list-inside ml-4">
-                                <li>duration: 移動にかかる秒数</li>
-                                <li>distance: 移動距離 (1小節の幅が約946px)</li>
-                                <li>dir: 0で左へ、1で右へ移動</li>
-                            </ul>
-                        </li>
-                        <li>音符の描画順は「先に叩く > TJAでの記述が早い」の順で手前に表示され、小節線は一番奥に描画されます。</li>
-                        <li>バックグラウンド再生に対応しています。ロジックは継続されますが、ブラウザの制限で描画が停止することがあります。</li>
-                    </ul>
+                <div><h3 class="text-lg font-semibold mb-2 border-b pb-1">基本操作</h3>
+                    <pre class="bg-gray-100 p-4 rounded font-mono text-sm whitespace-pre-wrap">・エディター左部の小節番号をクリックすると該当小節へジャンプします。
+・プレビュー画面中央の小節番号表示をクリックすると、直接入力してジャンプ可能です。
+・[Alt]キーを押しながらマウスホイール回転で、固定BPMを増減させ直感的な波形のズーム操作が可能です（BPM固定または波形表示時のみ有効）。
+・プレビュー画面で[←] [→]キーを押し続けると、時間経過で移動速度がどんどん加速します。
+・オートプレイ時はSEが事前にWAVとして合成され再生されるため、高密度譜面でも超軽量に動作します。</pre>
                 </div>
             </div>
-            <div class="mt-6 flex justify-end"><button id="closeHelpButton"
-                    class="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-black font-semibold rounded-lg">閉じる</button>
-            </div>
+            <div class="mt-6 flex justify-end"><button id="closeHelpButton" class="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-black font-semibold rounded-lg">閉じる</button></div>
         </div>
     </div>
 
     <script type="module">
         const editor = document.getElementById('tjaEditor');
+        const editorGutter = document.getElementById('editor-gutter');
+        const cursorPositionDisplay = document.getElementById('cursor-position-display');
         const canvas = document.getElementById('previewCanvas');
         const ctx = canvas.getContext('2d');
         const playButton = document.getElementById('playButton');
@@ -539,23 +324,27 @@ BALLOON:10
         let audioContext, seGainNode, musicGainNode;
         const audioBuffers = {};
         
-        // Web Audio API による楽曲再生用
         let musicAudioBuffer = null;
         let musicSourceNode = null;
+        let autoSeSourceNode = null;
         
         let isPlaying = false, animationFrameId = null, logicIntervalId = null, lastBPM = 120, currentCombo = 0, lastAutoEffectTime = 0, currentElapsedTime = 0.0, currentMeasureIndex = 0;
         
-        // 同期用・時間管理変数
         let simulationStartOffset = 0;
         let simulationStartTime = 0;
         let stopAtTime = null, chartCoolDownUntil = null, uploadedMusicFileName = null, uploadedMusicObjectURL = null;
         
         let allCourses = { globalConfig: {}, courses: {} }, currentChart = null, lastFrameTime = 0;
         let hitEffectTimeout = { donLeft: null, donRight: null, kaLeft: null, kaRight: null };
-        let lastSEPlayTime = { don: 0, ka: 0, balloon: 0 };
         let db;
 
-        let isAutoPlay = true, playerKeys = { donL: ['F'], donR: ['J'], kaL: ['D'], kaR: ['K'] }, autoRollSpeed = 60, renderFPS = 60, scrollMultiplier = 1.0, editorBgColor = '#111827', editorFgColor = '#22c55e', editorFontSize = 14, exportEncoding = 'SJIS', musicVolume = 1.0, seVolume = 1.0, playbackSpeed = 1.0;
+        // 拡張設定
+        let isFixedBpmEnabled = false;
+        let fixedBpmValue = 200;
+        let isWaveformEnabled = false;
+        let showGridLines = true;
+
+        let isAutoPlay = true, playerKeys = { donL: ['F'], donR: ['J'], kaL: ['D'], kaR: ['K'] }, autoRollSpeed = 60, renderFPS = 240, scrollMultiplier = 1.0, editorBgColor = '#111827', editorFgColor = '#4ade80', editorFontSize = 14, exportEncoding = 'SJIS', musicVolume = 1.0, seVolume = 1.0, playbackSpeed = 1.0;
         const coolDownTime = 1.0;
 
         const HIT_POSITION_X_DEFAULT = 175, BASE_SCROLL_FACTOR = 2.0, JPOS_INPUT_STANDARD_WIDTH = 946, JPOS_ACTUAL_MEASURE_WIDTH = 480;
@@ -566,770 +355,993 @@ BALLOON:10
 
         let state_commandIndex = 0, state_currentBPM = 120, state_isGogo = false, state_jposStartTime = -Infinity, state_jposDuration = 0, state_jposStartX = HIT_POSITION_X_DEFAULT, state_jposEndX = HIT_POSITION_X_DEFAULT, state_jposEasing = 0;
 
-        function initDB() {
-            return new Promise((resolve, reject) => {
-                const request = indexedDB.open('TJAEditorDB', 1);
-                request.onupgradeneeded = (event) => {
-                    const db = event.target.result;
-                    if (!db.objectStoreNames.contains('files')) {
-                        db.createObjectStore('files', { keyPath: 'id' });
-                    }
-                };
-                request.onsuccess = (event) => {
-                    db = event.target.result;
-                    resolve(db);
-                };
-                request.onerror = (event) => {
-                    console.error('IndexedDB error:', event.target.errorCode);
-                    reject(event.target.errorCode);
-                };
-            });
-        }
+        // === イベントリスナー系 ===
 
-        function saveData(storeName, data) {
-            if (!db) return Promise.reject("DB not initialized");
-            return new Promise((resolve, reject) => {
-                const transaction = db.transaction([storeName], 'readwrite');
-                const store = transaction.objectStore(storeName);
-                const request = store.put(data);
-                request.onsuccess = () => resolve();
-                request.onerror = (event) => reject(event.target.error);
-            });
+        function updateCursorPosition() {
+            const pos = editor.selectionStart;
+            const textToPos = editor.value.substring(0, pos);
+            const lines = textToPos.split('\n');
+            const row = lines.length;
+            const col = lines[lines.length - 1].length;
+            cursorPositionDisplay.innerText = `行: ${row}, 列: ${col}`;
         }
+        ['keyup', 'click', 'input', 'focus'].forEach(ev => editor.addEventListener(ev, updateCursorPosition));
 
-        function loadData(storeName, id) {
-            if (!db) return Promise.reject("DB not initialized");
-            return new Promise((resolve, reject) => {
-                const transaction = db.transaction([storeName], 'readonly');
-                const store = transaction.objectStore(storeName);
-                const request = store.get(id);
-                request.onsuccess = () => resolve(request.result);
-                request.onerror = (event) => reject(event.target.error);
-            });
-        }
+        // エディタースクロールとGutterの同期 (パッシブでスムーズに)
+        const syncScroll = () => { editorGutter.scrollTop = editor.scrollTop; };
+        editor.addEventListener('scroll', syncScroll, { passive: true });
+        editor.addEventListener('input', syncScroll);
+        editor.addEventListener('keyup', syncScroll);
+        editor.addEventListener('click', syncScroll);
 
-        async function loadAudioBuffer(url, key) {
-            if (!audioContext) return;
-            try {
-                const response = await fetch(url);
-                const arrayBuffer = await response.arrayBuffer();
-                audioBuffers[key] = await audioContext.decodeAudioData(arrayBuffer);
-            } catch (e) { console.warn(`Failed to load audio: ${url}`, e); }
-        }
-
-        function initializeAudio() {
-            if (!audioContext) {
-                try {
-                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                    
-                    seGainNode = audioContext.createGain();
-                    seGainNode.gain.value = seVolume;
-                    seGainNode.connect(audioContext.destination);
-                    
-                    musicGainNode = audioContext.createGain();
-                    musicGainNode.gain.value = musicVolume;
-                    musicGainNode.connect(audioContext.destination);
-                    
-                } catch (e) { console.error("Web Audio API is not supported in this browser"); return; }
-            } else {
-                if (seGainNode) seGainNode.gain.value = seVolume;
-                if (musicGainNode) musicGainNode.gain.value = musicVolume;
+        // Gutter描画
+        function updateEditorGutter() {
+            if (!currentChart || !currentChart.lineToMeasure) { editorGutter.innerHTML = ''; return; }
+            const lines = editor.value.split('\n');
+            let html = '';
+            for (let i = 0; i < lines.length; i++) {
+                const measureNum = currentChart.lineToMeasure[i];
+                if (measureNum !== undefined && measureNum !== '') {
+                    html += `<div class="gutter-line" data-time="${currentChart.lineToTime[i]}" title="第${measureNum}小節へ移動">${measureNum}</div>`;
+                } else {
+                    html += `<div style="height: 1.5rem;"></div>`;
+                }
             }
+            editorGutter.innerHTML = html;
+            editorGutter.scrollTop = editor.scrollTop;
+        }
+
+        editorGutter.addEventListener('click', (e) => {
+            if (e.target.classList.contains('gutter-line')) {
+                const time = parseFloat(e.target.dataset.time);
+                if (!isNaN(time)) {
+                    setChartTime(time);
+                    if (isPlaying) { stopSimulation(); startSimulation(); }
+                }
+            }
+        });
+
+        // プレビュー上の小節表示UI（直接入力）
+        measureDisplay.addEventListener('click', (e) => {
+            e.stopPropagation(); 
+            if (measureDisplay.isEditing) return;
+            measureDisplay.isEditing = true;
+            measureDisplay.contentEditable = "true";
+            measureDisplay.focus();
             
-            ['don', 'ka', 'balloon'].forEach(key => {
-                const base64 = localStorage.getItem(`se_${key}`);
-                if (base64 && !audioBuffers[key]) {
-                    loadAudioBuffer(base64, key);
-                } else if (!audioBuffers[key]) {
-                    loadAudioBuffer(`${key}.ogg`, key);
+            measureDisplay.innerText = currentMeasureIndex; 
+            const range = document.createRange();
+            range.selectNodeContents(measureDisplay);
+            const sel = window.getSelection();
+            sel.removeAllRanges(); sel.addRange(range);
+        });
+
+        // 判定文字入力の親へのバブリングを完全ブロック
+        ['keydown', 'keyup', 'keypress'].forEach(ev => {
+            measureDisplay.addEventListener(ev, (e) => {
+                e.stopPropagation();
+                if (ev === 'keydown' && e.key === 'Enter') {
+                    e.preventDefault();
+                    measureDisplay.blur();
                 }
             });
+        });
+
+        measureDisplay.addEventListener('blur', () => {
+            measureDisplay.contentEditable = "false";
+            measureDisplay.isEditing = false;
+            
+            const input = parseInt(measureDisplay.innerText, 10);
+            const maxMeasure = currentChart && currentChart.allMeasureTimes.length > 0 ? currentChart.allMeasureTimes.length - 1 : 0;
+            
+            if (!isNaN(input) && input >= 0 && input <= maxMeasure) {
+                setChartTime(currentChart.allMeasureTimes[input]);
+                if (isPlaying) {
+                    stopSimulation();
+                    const targetTime = currentChart.allMeasureTimes[input];
+                    currentElapsedTime = Math.max(0, targetTime - coolDownTime);
+                    chartCoolDownUntil = targetTime;
+                    seekChartState(currentElapsedTime);
+                    stopAtTime = null;
+                    startSimulation();
+                }
+            } else {
+                updateMeasureDisplay(); 
+            }
+        });
+
+        // Alt + マウスホイールでBPM操作
+        window.addEventListener('wheel', (e) => {
+            if (e.altKey && (isFixedBpmEnabled || isWaveformEnabled)) {
+                e.preventDefault();
+                const delta = e.deltaY > 0 ? -10 : 10;
+                fixedBpmValue = Math.max(10, fixedBpmValue + delta);
+                document.getElementById('fixedBpmValueSetting').value = fixedBpmValue;
+                if (!isPlaying) updatePreview();
+            }
+        }, { passive: false });
+
+        function getEffectivePPS(bpm, scroll, scrollY) {
+            let currentBpmScroll = bpm * scroll;
+            let currentBpmScrollY = bpm * scrollY;
+            if (isFixedBpmEnabled || isWaveformEnabled) {
+                currentBpmScroll = fixedBpmValue;
+                currentBpmScrollY = (bpm !== 0) ? scrollY * (fixedBpmValue / bpm) : 0;
+            }
+            const ppsX = BASE_SCROLL_FACTOR * currentBpmScroll * scrollMultiplier;
+            const ppsY = BASE_SCROLL_FACTOR * currentBpmScrollY * scrollMultiplier;
+            return { ppsX, ppsY };
         }
 
-        function calculateEasing(t, type) { switch (type) { case 0: default: return t; } }
+        // IndexedDB
+        function initDB() { return new Promise((resolve, reject) => { const request = indexedDB.open('TJAEditorDB', 1); request.onupgradeneeded = (event) => { const db = event.target.result; if (!db.objectStoreNames.contains('files')) { db.createObjectStore('files', { keyPath: 'id' }); } }; request.onsuccess = (event) => { db = event.target.result; resolve(db); }; request.onerror = (event) => { reject(event.target.errorCode); }; }); }
+        function saveData(storeName, data) { if (!db) return Promise.reject("DB not initialized"); return new Promise((resolve, reject) => { const tx = db.transaction([storeName], 'readwrite'); const store = tx.objectStore(storeName); const req = store.put(data); req.onsuccess = () => resolve(); req.onerror = (event) => reject(event.target.error); }); }
+        function loadData(storeName, id) { if (!db) return Promise.reject("DB not initialized"); return new Promise((resolve, reject) => { const tx = db.transaction([storeName], 'readonly'); const store = tx.objectStore(storeName); const req = store.get(id); req.onsuccess = () => resolve(req.result); req.onerror = (event) => reject(event.target.error); }); }
+
+        // Audio
+        async function loadAudioBuffer(url, key) { if (!audioContext) return; try { const response = await fetch(url); const arrayBuffer = await response.arrayBuffer(); audioBuffers[key] = await audioContext.decodeAudioData(arrayBuffer); } catch (e) {} }
+        function initializeAudio() { if (!audioContext) { try { audioContext = new (window.AudioContext || window.webkitAudioContext)(); seGainNode = audioContext.createGain(); seGainNode.gain.value = seVolume; seGainNode.connect(audioContext.destination); musicGainNode = audioContext.createGain(); musicGainNode.gain.value = musicVolume; musicGainNode.connect(audioContext.destination); } catch (e) { return; } } else { if (seGainNode) seGainNode.gain.value = seVolume; if (musicGainNode) musicGainNode.gain.value = musicVolume; } ['don', 'ka', 'balloon'].forEach(key => { const base64 = localStorage.getItem(`se_${key}`); if (base64 && !audioBuffers[key]) { loadAudioBuffer(base64, key); } else if (!audioBuffers[key]) { loadAudioBuffer(`${key}.ogg`, key); } }); }
+
+        function calculateEasing(t, type) { return t; }
+        function lowerBound(arr, time) { let lo = 0, hi = arr.length; while (lo < hi) { const mid = (lo + hi) >>> 1; if (arr[mid].time < time) lo = mid + 1; else hi = mid; } return lo; }
+        function upperBound(arr, time) { let lo = 0, hi = arr.length; while (lo < hi) { const mid = (lo + hi) >>> 1; if (arr[mid].time <= time) lo = mid + 1; else hi = mid; } return lo; }
+        function prepareChartCache(chart) { if (!chart) return; const barlines = [], regular = []; for (const note of chart.notes) { if (note.type === 'BARLINE') barlines.push(note); else regular.push(note); } chart.barlineArr = barlines; chart.regularArr = regular; chart._autoCheckStart = 0; }
+
         function parseTJA(text) {
-            const lines = text.split('\n').map(line => { const commentIndex = line.indexOf('//'); return (commentIndex !== -1) ? line.substring(0, commentIndex).trim() : line.trim(); });
+            const lines = text.split('\n');
             const globalConfig = { BPM: 120, OFFSET: 0, BALLOON: [], TITLE: "No Title", SUBTITLE: "" };
             const courses = {}; let currentCourseKey = 3, currentChart = null;
             let currentBPM, currentTime, currentMeasureRatio, currentRoll, isGogo, currentScroll, currentScrollY, currentBarline, barlineNeeded = false;
+            
             function parseHeader(line) { const parts = line.split(':'); if (parts.length < 2) return; const key = parts[0].toUpperCase(), value = parts.slice(1).join(':').trim(); try { switch (key) { case 'TITLE': globalConfig.TITLE = value; break; case 'SUBTITLE': globalConfig.SUBTITLE = value; break; case 'BPM': globalConfig.BPM = parseFloat(value) * playbackSpeed; break; case 'WAVE': globalConfig.WAVE = value; break; case 'OFFSET': globalConfig.OFFSET = parseFloat(value) / playbackSpeed; break; case 'BALLOON': const ballonValues = value.split(',').map(v => parseInt(v.trim(), 10)).filter(v => !isNaN(v)); if (currentChart) { currentChart.ballonList = ballonValues; } else { globalConfig.BALLOON = ballonValues; } break; } } catch (e) { } }
-            function resetCourseState(key) { const newChart = { notes: [], commands: [], errors: [], maxCombo: 0, endTime: 0, barlineTimes: [0.0], allMeasureTimes: [0.0], ballonList: [], ballonIndex: 0, courseName: key }; courses[key] = newChart; currentChart = newChart; currentBPM = globalConfig.BPM; currentTime = 1.0; if (globalConfig.OFFSET < 0) { currentTime -= globalConfig.OFFSET; } currentMeasureRatio = 1.0; currentRoll = null; isGogo = false; currentScroll = 1.0; currentScrollY = 0.0; currentBarline = true; barlineNeeded = false; currentChart.commands.push({ time: -Infinity, type: 'BPMCHANGE', value: currentBPM }); currentChart.commands.push({ time: -Infinity, type: 'SCROLL', value: 1.0, valueY: 0.0 }); currentChart.commands.push({ time: -Infinity, type: 'BARLINEON' }); }
-            function parseCommand(commandStr) { if (!currentChart) return; const spaceIndex = commandStr.indexOf(' '); let commandName = commandStr, valueStr = ""; if (spaceIndex !== -1) { commandName = commandStr.substring(0, spaceIndex); valueStr = commandStr.substring(spaceIndex + 1).trim(); } switch (commandName) { case "#BPMCHANGE": const bpmValue = parseFloat(valueStr); if (!isNaN(bpmValue)) { currentBPM = bpmValue * playbackSpeed; currentChart.commands.push({ time: currentTime, type: 'BPMCHANGE', value: bpmValue * playbackSpeed }); } break; case "#DELAY": const delayValue = parseFloat(valueStr); if (!isNaN(delayValue)) { const adjustedDelay = delayValue / playbackSpeed; currentChart.commands.push({ time: currentTime, type: 'DELAY', value: adjustedDelay }); currentTime += adjustedDelay; } break; case "#MEASURE": const parts = valueStr.split('/'); if (parts.length === 2) { const num = parseFloat(parts[0]), den = parseFloat(parts[1]); if (!isNaN(num) && !isNaN(den) && den > 0) { currentMeasureRatio = num / den; currentChart.commands.push({ time: currentTime, type: 'MEASURE', value: valueStr, ratio: currentMeasureRatio }); } } break; case "#GOGOSTART": isGogo = true; currentChart.commands.push({ time: currentTime, type: 'GOGOSTART' }); break; case "#GOGOEND": isGogo = false; currentChart.commands.push({ time: currentTime, type: 'GOGOEND' }); break; case "#SCROLL": let real = 1.0, imag = 0.0, parsed = false; let match = valueStr.match(/^([+-]?\d*\.?\d*)\s*([+-]\d*\.?\d*)\s*i$/); if (match) { real = parseFloat(match[1] || '0'); imag = parseFloat(match[2] || '1'); parsed = true; } if (!parsed) { match = valueStr.match(/^([+-]?\d*\.?\d*)\s*i$/); if (match) { real = 0.0; imag = parseFloat(match[1] || '1'); if (match[1] === '+') imag = 1; if (match[1] === '-') imag = -1; parsed = true; } } if (!parsed) { match = valueStr.match(/^([+-]?\d*\.?\d*)$/); if (match && match[1] !== "") { real = parseFloat(match[1]); imag = 0.0; parsed = true; } } if (parsed && !isNaN(real) && !isNaN(imag)) { currentScroll = real; currentScrollY = imag; currentChart.commands.push({ time: currentTime, type: 'SCROLL', value: currentScroll, valueY: currentScrollY }); } break; case "#JPOSSCROLL": const args = valueStr.split(' '), duration = parseFloat(args[0] || 0), inputDistance = parseFloat(args[1] || 0), direction = parseInt(args[2] || 0); const calculatedDistance = (inputDistance / JPOS_INPUT_STANDARD_WIDTH) * JPOS_ACTUAL_MEASURE_WIDTH; const relativeX = calculatedDistance * (direction === 0 ? -1 : 1); currentChart.commands.push({ time: currentTime, type: 'JPOSSCROLL', duration: duration, relativeX: relativeX, easing: 0 }); break; case "#BARLINEON": currentBarline = true; currentChart.commands.push({ time: currentTime, type: 'BARLINEON' }); break; case "#BARLINEOFF": currentBarline = false; currentChart.commands.push({ time: currentTime, type: 'BARLINEOFF' }); break; case "#END": case "#START": break; } }
-            function processMeasure(noteChars, commandsInMeasure) { if (!currentChart) return; if (barlineNeeded && currentBarline) { currentChart.notes.push({ time: currentTime, type: 'BARLINE', hitProcessed: true, judgeResult: 'pending', bpm: currentBPM, scroll: currentScroll, scrollY: currentScrollY, barlineVisible: currentBarline }); currentChart.barlineTimes.push(currentTime); } if (barlineNeeded) { currentChart.allMeasureTimes.push(currentTime); } barlineNeeded = false; if (noteChars.length === 0 && commandsInMeasure.length === 0) { noteChars = "0"; } const noteCountInMeasure = noteChars.length, measureDurationInBeats = 4.0 * currentMeasureRatio, beatsPerNote = (noteCountInMeasure > 0) ? (measureDurationInBeats / noteCountInMeasure) : 0; let commandIndex = 0; for (let j = 0; j < noteChars.length; j++) { while (commandIndex < commandsInMeasure.length && commandsInMeasure[commandIndex].noteIndex === j) { parseCommand(commandsInMeasure[commandIndex].commandStr); commandIndex++; } const char = noteChars[j], charTime = currentTime; const secondsPerThisNote = beatsPerNote * (60.0 / currentBPM); currentTime += secondsPerThisNote; const noteState = { bpm: currentBPM, scroll: currentScroll, scrollY: currentScrollY }; switch (char) { case '0': break; case '1': case '2': case '3': case '4': currentChart.notes.push({ time: charTime, endTime: currentTime, type: char, hits: 0, hitProcessed: false, judgeResult: 'pending', ...noteState }); currentChart.maxCombo++; currentChart.endTime = Math.max(currentChart.endTime, currentTime); break; case '5': case '6': case '7': if (currentRoll) { currentRoll.endTime = charTime; currentChart.notes.push(currentRoll); currentChart.endTime = Math.max(currentChart.endTime, currentRoll.endTime); currentRoll = null; } let hits = 0; if (char === '7') { const ballonList = (currentChart.ballonList.length > 0) ? currentChart.ballonList : globalConfig.BALLOON; if (ballonList.length > 0) { hits = ballonList[Math.min(currentChart.ballonIndex, ballonList.length - 1)] || 0; } else { hits = 0; } currentChart.ballonIndex++; } currentRoll = { time: charTime, endTime: currentTime, type: char, hits: hits, currentHits: 0, hitProcessed: false, lastAutoHitTime: 0, judgeResult: 'pending', ...noteState }; break; case '8': if (currentRoll) { currentRoll.endTime = charTime; currentChart.notes.push(currentRoll); currentChart.endTime = Math.max(currentChart.endTime, currentRoll.endTime); currentRoll = null; } break; } } while (commandIndex < commandsInMeasure.length) { parseCommand(commandsInMeasure[commandIndex].commandStr); commandIndex++; } }
-            let parsingNotes = false, measureNotesStr = "", measureCommands = []; for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) { const line = lines[lineIndex]; if (line.length === 0) continue; if (!parsingNotes) { if (line.startsWith('COURSE:')) { const value = line.split(':')[1].trim(); if (value.match(/^[0-4]$/)) currentCourseKey = parseInt(value, 10); else if (value.toLowerCase() === 'easy') currentCourseKey = 0; else if (value.toLowerCase() === 'normal') currentCourseKey = 1; else if (value.toLowerCase() === 'hard') currentCourseKey = 2; else if (value.toLowerCase() === 'oni') currentCourseKey = 3; else if (value.toLowerCase() === 'edit') currentCourseKey = 4; if (!courses[currentCourseKey]) { resetCourseState(currentCourseKey); } currentChart = courses[currentCourseKey]; } else if (line === "#START") { if (!currentChart) { currentCourseKey = 3; if (!courses[currentCourseKey]) resetCourseState(currentCourseKey); currentChart = courses[currentCourseKey]; } parsingNotes = true; barlineNeeded = true; measureNotesStr = ""; measureCommands = []; } else { parseHeader(line); if (line.startsWith('BPM:') && currentChart) { currentBPM = globalConfig.BPM; currentChart.commands[0].value = currentBPM; } } } else { if (line === "#END") { if (measureNotesStr.length > 0 || measureCommands.length > 0 || barlineNeeded) { processMeasure(measureNotesStr, measureCommands); } if (currentRoll) { currentRoll.endTime = currentTime; currentChart.notes.push(currentRoll); currentChart.endTime = Math.max(currentChart.endTime, currentRoll.endTime); currentRoll = null; } parsingNotes = false; currentChart = null; continue; } if (line.startsWith("#")) { if (measureNotesStr.length === 0 && measureCommands.length === 0) { parseCommand(line); } else { measureCommands.push({ commandStr: line, noteIndex: measureNotesStr.length }); } } else { let i = 0; while (i < line.length) { const char = line[i]; if (char === '#') { let commandEnd = i + 1; while (commandEnd < line.length && line[commandEnd] !== '#' && line[commandEnd] !== ',') { commandEnd++; } const commandStr = line.substring(i, commandEnd); measureCommands.push({ commandStr: commandStr, noteIndex: measureNotesStr.length }); i = commandEnd; } else if (char >= '0' && char <= '8') { measureNotesStr += char; i++; } else if (char === ',') { processMeasure(measureNotesStr, measureCommands); measureNotesStr = ""; measureCommands = []; barlineNeeded = true; i++; } else { i++; } } } } }
-            for (const key in courses) { const chart = courses[key]; chart.notes.sort((a, b) => a.time - b.time); if (chart.barlineTimes.length > 0) { const lastBarlineTime = chart.barlineTimes.pop(); if (chart.notes.length > 0 && chart.notes[chart.notes.length - 1].type === 'BARLINE' && chart.notes[chart.notes.length - 1].time === lastBarlineTime) { chart.notes.pop(); } } if (chart.allMeasureTimes.length > 0) { chart.allMeasureTimes.pop(); } chart.commands.sort((a, b) => a.time - b.time); chart.endTime = (chart.notes.length > 0) ? chart.notes.reduce((max, note) => Math.max(max, note.endTime || note.time), 0) : 0; }
+            
+            function resetCourseState(key) { const newChart = { notes: [], commands: [], errors: [], maxCombo: 0, endTime: 0, measureEndTime: 0, barlineTimes: [0.0], allMeasureTimes: [0.0], ballonList: [], ballonIndex: 0, courseName: key }; courses[key] = newChart; currentChart = newChart; currentBPM = globalConfig.BPM; currentTime = 1.0; if (globalConfig.OFFSET < 0) { currentTime -= globalConfig.OFFSET; } currentMeasureRatio = 1.0; currentRoll = null; isGogo = false; currentScroll = 1.0; currentScrollY = 0.0; currentBarline = true; barlineNeeded = false; currentChart.commands.push({ time: -Infinity, type: 'BPMCHANGE', value: currentBPM }); currentChart.commands.push({ time: -Infinity, type: 'SCROLL', value: 1.0, valueY: 0.0 }); currentChart.commands.push({ time: -Infinity, type: 'BARLINEON' }); }
+            
+            function parseCommand(commandStr) { if (!currentChart) return; const spaceIndex = commandStr.indexOf(' '); let commandName = commandStr, valueStr = ""; if (spaceIndex !== -1) { commandName = commandStr.substring(0, spaceIndex); valueStr = commandStr.substring(spaceIndex + 1).trim(); } switch (commandName) { case "#BPMCHANGE": const bpmValue = parseFloat(valueStr); if (!isNaN(bpmValue)) { currentBPM = bpmValue * playbackSpeed; currentChart.commands.push({ time: currentTime, type: 'BPMCHANGE', value: bpmValue * playbackSpeed }); } break; case "#DELAY": const delayValue = parseFloat(valueStr); if (!isNaN(delayValue)) { const adjustedDelay = delayValue / playbackSpeed; currentChart.commands.push({ time: currentTime, type: 'DELAY', value: adjustedDelay }); currentTime += adjustedDelay; } break; case "#MEASURE": const parts = valueStr.split('/'); if (parts.length === 2) { const num = parseFloat(parts[0]), den = parseFloat(parts[1]); if (!isNaN(num) && !isNaN(den) && den > 0) { currentMeasureRatio = num / den; currentChart.commands.push({ time: currentTime, type: 'MEASURE', value: valueStr, ratio: currentMeasureRatio }); } } break; case "#GOGOSTART": isGogo = true; currentChart.commands.push({ time: currentTime, type: 'GOGOSTART' }); break; case "#GOGOEND": isGogo = false; currentChart.commands.push({ time: currentTime, type: 'GOGOEND' }); break; case "#SCROLL": let real = 1.0, imag = 0.0, parsed = false; let match = valueStr.match(/^([+-]?\d*\.?\d*)\s*([+-]\d*\.?\d*)\s*i$/); if (match) { real = parseFloat(match[1] || '0'); imag = parseFloat(match[2] || '1'); parsed = true; } if (!parsed) { match = valueStr.match(/^([+-]?\d*\.?\d*)\s*i$/); if (match) { real = 0.0; imag = parseFloat(match[1] || '1'); if (match[1] === '+') imag = 1; if (match[1] === '-') imag = -1; parsed = true; } } if (!parsed) { match = valueStr.match(/^([+-]?\d*\.?\d*)$/); if (match && match[1] !== "") { real = parseFloat(match[1]); imag = 0.0; parsed = true; } } if (parsed && !isNaN(real) && !isNaN(imag)) { currentScroll = real; currentScrollY = imag; currentChart.commands.push({ time: currentTime, type: 'SCROLL', value: currentScroll, valueY: currentScrollY }); } break; case "#JPOSSCROLL": const args = valueStr.split(' '), duration = parseFloat(args[0] || 0), inputDistance = parseFloat(args[1] || 0), direction = parseInt(args[2] || 0); const calculatedDistance = (inputDistance / JPOS_INPUT_STANDARD_WIDTH) * JPOS_ACTUAL_MEASURE_WIDTH; const relativeX = calculatedDistance * (direction === 0 ? -1 : 1); currentChart.commands.push({ time: currentTime, type: 'JPOSSCROLL', duration: duration, relativeX: relativeX, easing: 0 }); break; case "#BARLINEON": currentBarline = true; currentChart.commands.push({ time: currentTime, type: 'BARLINEON' }); break; case "#BARLINEOFF": currentBarline = false; currentChart.commands.push({ time: currentTime, type: 'BARLINEOFF' }); break; } }
+            
+            function processMeasure(noteChars, commandsInMeasure) { 
+                if (!currentChart) return; 
+                if (barlineNeeded && currentBarline) { currentChart.notes.push({ time: currentTime, type: 'BARLINE', hitProcessed: true, judgeResult: 'pending', bpm: currentBPM, scroll: currentScroll, scrollY: currentScrollY, barlineVisible: currentBarline }); currentChart.barlineTimes.push(currentTime); } 
+                if (barlineNeeded) { currentChart.allMeasureTimes.push(currentTime); } barlineNeeded = false; 
+                if (noteChars.length === 0 && commandsInMeasure.length === 0) { noteChars = "0"; } 
+                
+                const noteCountInMeasure = noteChars.length;
+                let commandIndex = 0; 
+                
+                for (let j = 0; j < noteChars.length; j++) { 
+                    while (commandIndex < commandsInMeasure.length && commandsInMeasure[commandIndex].noteIndex === j) { 
+                        parseCommand(commandsInMeasure[commandIndex].commandStr); 
+                        commandIndex++; 
+                    } 
+                    
+                    const measureDurationInBeats = 4.0 * currentMeasureRatio; 
+                    const beatsPerNote = (noteCountInMeasure > 0) ? (measureDurationInBeats / noteCountInMeasure) : 0; 
+                    
+                    const char = noteChars[j], charTime = currentTime; 
+                    const secondsPerThisNote = beatsPerNote * (60.0 / currentBPM); 
+                    currentTime += secondsPerThisNote; 
+                    const noteState = { bpm: currentBPM, scroll: currentScroll, scrollY: currentScrollY }; 
+                    
+                    switch (char) { 
+                        case '0': currentChart.notes.push({ time: charTime, endTime: currentTime, type: '0', hits: 0, hitProcessed: true, judgeResult: 'none', ...noteState }); break; 
+                        case '1': case '2': case '3': case '4': currentChart.notes.push({ time: charTime, endTime: currentTime, type: char, hits: 0, hitProcessed: false, judgeResult: 'pending', ...noteState }); currentChart.maxCombo++; currentChart.endTime = Math.max(currentChart.endTime, currentTime); break; 
+                        case '5': case '6': case '7': if (currentRoll) { currentRoll.endTime = charTime; currentChart.notes.push(currentRoll); currentChart.endTime = Math.max(currentChart.endTime, currentRoll.endTime); currentRoll = null; } let hits = 0; if (char === '7') { const ballonList = (currentChart.ballonList.length > 0) ? currentChart.ballonList : globalConfig.BALLOON; if (ballonList.length > 0) { hits = ballonList[Math.min(currentChart.ballonIndex, ballonList.length - 1)] || 0; } else { hits = 0; } currentChart.ballonIndex++; } currentRoll = { time: charTime, endTime: currentTime, type: char, hits: hits, currentHits: 0, hitProcessed: false, lastAutoHitTime: 0, judgeResult: 'pending', ...noteState }; break; 
+                        case '8': if (currentRoll) { currentRoll.endTime = charTime; currentChart.notes.push(currentRoll); currentChart.endTime = Math.max(currentChart.endTime, currentRoll.endTime); currentRoll = null; } break; 
+                    } 
+                } 
+                while (commandIndex < commandsInMeasure.length) { parseCommand(commandsInMeasure[commandIndex].commandStr); commandIndex++; } 
+            }
+            
+            const lineToMeasure = new Array(lines.length).fill('');
+            const lineToTime = new Array(lines.length).fill(0);
+            
+            let currentMeasureForDisplay = null;
+            let measureStartTime = 0;
+            let parsingNotes = false, measureNotesStr = "", measureCommands = []; 
+
+            for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) { 
+                let rawLine = lines[lineIndex];
+                const commentIndex = rawLine.indexOf('//'); 
+                const line = (commentIndex !== -1) ? rawLine.substring(0, commentIndex).trim() : rawLine.trim();
+
+                if (!parsingNotes) { 
+                    lineToMeasure[lineIndex] = ""; 
+                    if (line.startsWith('COURSE:')) { 
+                        const value = line.split(':')[1].trim(); if (value.match(/^[0-4]$/)) currentCourseKey = parseInt(value, 10); else if (value.toLowerCase() === 'easy') currentCourseKey = 0; else if (value.toLowerCase() === 'normal') currentCourseKey = 1; else if (value.toLowerCase() === 'hard') currentCourseKey = 2; else if (value.toLowerCase() === 'oni') currentCourseKey = 3; else if (value.toLowerCase() === 'edit') currentCourseKey = 4; 
+                        if (!courses[currentCourseKey]) resetCourseState(currentCourseKey); currentChart = courses[currentCourseKey]; 
+                    } else if (line === "#START") { 
+                        if (!currentChart) { currentCourseKey = 3; if (!courses[currentCourseKey]) resetCourseState(currentCourseKey); currentChart = courses[currentCourseKey]; } 
+                        parsingNotes = true; barlineNeeded = true; measureNotesStr = ""; measureCommands = []; 
+                        currentMeasureForDisplay = 1;
+                        measureStartTime = currentTime;
+                        lineToTime[lineIndex] = measureStartTime;
+                    } else if (line.length > 0) { 
+                        parseHeader(line); if (line.startsWith('BPM:') && currentChart) { currentBPM = globalConfig.BPM; currentChart.commands[0].value = currentBPM; } 
+                    } 
+                } else { 
+                    lineToTime[lineIndex] = measureStartTime;
+
+                    if (line === "#END") { 
+                        if (measureNotesStr.length > 0 || measureCommands.length > 0 || barlineNeeded) { processMeasure(measureNotesStr, measureCommands); } 
+                        if (currentRoll) { currentRoll.endTime = currentTime; currentChart.notes.push(currentRoll); currentChart.endTime = Math.max(currentChart.endTime, currentRoll.endTime); currentRoll = null; } 
+                        currentChart.measureEndTime = currentTime; parsingNotes = false; currentChart = null;
+                        lineToMeasure[lineIndex] = "";
+                        continue; 
+                    } 
+
+                    if (line.indexOf(',') !== -1) {
+                        lineToMeasure[lineIndex] = currentMeasureForDisplay !== null ? currentMeasureForDisplay : "";
+                        let i = 0; 
+                        while (i < line.length) { 
+                            const char = line[i]; 
+                            if (char === '#') { let commandEnd = i + 1; while (commandEnd < line.length && line[commandEnd] !== '#' && line[commandEnd] !== ',') { commandEnd++; } const commandStr = line.substring(i, commandEnd); measureCommands.push({ commandStr: commandStr, noteIndex: measureNotesStr.length }); i = commandEnd; } 
+                            else if (char >= '0' && char <= '8') { measureNotesStr += char; i++; } 
+                            else if (char === ',') { 
+                                processMeasure(measureNotesStr, measureCommands); measureNotesStr = ""; measureCommands = []; barlineNeeded = true; 
+                                measureStartTime = currentTime;
+                                i++; 
+                            } else { i++; } 
+                        } 
+                        currentMeasureForDisplay++;
+                    } else if (line.length > 0) {
+                        lineToMeasure[lineIndex] = currentMeasureForDisplay !== null ? currentMeasureForDisplay : "";
+                        if (line.startsWith("#")) { 
+                            if (measureNotesStr.length === 0 && measureCommands.length === 0) { parseCommand(line); } else { measureCommands.push({ commandStr: line, noteIndex: measureNotesStr.length }); } 
+                        } else { 
+                            let i = 0; 
+                            while (i < line.length) { 
+                                const char = line[i]; 
+                                if (char >= '0' && char <= '8') { measureNotesStr += char; i++; } else { i++; } 
+                            } 
+                        }
+                    } else {
+                        lineToMeasure[lineIndex] = "";
+                    }
+                } 
+            }
+            
+            for (const key in courses) { 
+                const chart = courses[key]; chart.notes.sort((a, b) => a.time - b.time); 
+                if (chart.barlineTimes.length > 0) { const lastBarlineTime = chart.barlineTimes.pop(); if (chart.notes.length > 0 && chart.notes[chart.notes.length - 1].type === 'BARLINE' && chart.notes[chart.notes.length - 1].time === lastBarlineTime) { chart.notes.pop(); } } 
+                if (chart.allMeasureTimes.length > 0) { chart.allMeasureTimes.pop(); } 
+                chart.commands.sort((a, b) => a.time - b.time); chart.endTime = (chart.notes.length > 0) ? chart.notes.reduce((max, note) => Math.max(max, note.endTime || note.time), 0) : 0; 
+                chart.lineToMeasure = lineToMeasure; chart.lineToTime = lineToTime;
+                prepareChartCache(chart); 
+            }
             lastBPM = globalConfig.BPM; return { globalConfig, courses };
         }
-        function resizeCanvas() {
-            const dpr = window.devicePixelRatio || 1;
-            canvas.width = canvas.clientWidth * dpr;
-            canvas.height = canvas.clientHeight * dpr;
-            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        function resizeCanvas() { const dpr = window.devicePixelRatio || 1; canvas.width = canvas.clientWidth * dpr; canvas.height = canvas.clientHeight * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
+
+        function drawWaveform(elapsedTime) {
+            if (!isWaveformEnabled || !musicAudioBuffer) return;
+            const data = musicAudioBuffer.getChannelData(0);
+            const sampleRate = musicAudioBuffer.sampleRate;
+            const canvasWidth = canvas.clientWidth;
+            const centerY = canvas.clientHeight / 2;
+            
+            const ppsX = BASE_SCROLL_FACTOR * fixedBpmValue * scrollMultiplier;
+            
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+            
+            const offset = allCourses.globalConfig.OFFSET || 0;
+            const targetTime = coolDownTime + Math.max(0, offset);
+            
+            const timeAtLeft = elapsedTime + (0 - HIT_POSITION_X) / ppsX;
+            const timeAtRight = elapsedTime + (canvasWidth - HIT_POSITION_X) / ppsX;
+            
+            const audioTimeStart = (timeAtLeft - targetTime) * playbackSpeed;
+            const audioTimeEnd = (timeAtRight - targetTime) * playbackSpeed;
+            
+            const windowAudioTime = (1 / ppsX) * playbackSpeed;
+            
+            let currentAudioTime = Math.floor(audioTimeStart / windowAudioTime) * windowAudioTime;
+
+            const topPath = [];
+            const bottomPath = [];
+
+            while (currentAudioTime <= audioTimeEnd + windowAudioTime) {
+                let rms = 0;
+                if (currentAudioTime >= 0 && currentAudioTime < musicAudioBuffer.duration) {
+                    const startSample = Math.floor(currentAudioTime * sampleRate);
+                    const endSample = Math.min(data.length, Math.floor((currentAudioTime + windowAudioTime) * sampleRate));
+                    
+                    let sum = 0, count = 0;
+                    const step = Math.max(1, Math.floor((endSample - startSample) / 30));
+                    for (let i = startSample; i < endSample; i += step) {
+                        sum += data[i] * data[i];
+                        count++;
+                    }
+                    rms = count > 0 ? Math.sqrt(sum / count) : 0;
+                }
+                
+                const timeAtX = currentAudioTime / playbackSpeed + targetTime;
+                const x = (timeAtX - elapsedTime) * ppsX + HIT_POSITION_X;
+
+                const amp = rms * canvas.clientHeight * 1.5; 
+                topPath.push({x: x, y: centerY - amp});
+                bottomPath.unshift({x: x, y: centerY + amp});
+                
+                currentAudioTime += windowAudioTime;
+            }
+            
+            if (topPath.length === 0) return;
+
+            ctx.beginPath();
+            ctx.moveTo(topPath[0].x, topPath[0].y);
+            for(let i=1; i<topPath.length; i++) ctx.lineTo(topPath[i].x, topPath[i].y);
+            for(let i=0; i<bottomPath.length; i++) ctx.lineTo(bottomPath[i].x, bottomPath[i].y);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
         }
-        function updateChartState(timeSec) { if (!currentChart) { HIT_POSITION_X = HIT_POSITION_X_DEFAULT; hitCircle.style.left = (HIT_POSITION_X_DEFAULT - 30) + 'px'; previewContainer.classList.remove('gogo-time'); return; } while (state_commandIndex < currentChart.commands.length) { const cmd = currentChart.commands[state_commandIndex]; if (cmd.time > timeSec) { break; } switch (cmd.type) { case 'BPMCHANGE': state_currentBPM = cmd.value; break; case 'GOGOSTART': state_isGogo = true; break; case 'GOGOEND': state_isGogo = false; break; case 'JPOSSCROLL': if (state_jposStartTime > -Infinity) { const prevCmdEndTime = state_jposStartTime + state_jposDuration; if (cmd.time < prevCmdEndTime) { const progress = (state_jposDuration === 0) ? 1.0 : (cmd.time - state_jposStartTime) / state_jposDuration; const easedProgress = calculateEasing(progress, state_jposEasing); state_jposStartX += (state_jposEndX - state_jposStartX) * easedProgress; } else { state_jposStartX = state_jposEndX; } } state_jposStartTime = cmd.time; state_jposDuration = cmd.duration; state_jposEndX = state_jposStartX + cmd.relativeX; state_jposEasing = cmd.easing; break; } state_commandIndex++; } let calculatedHitX = state_jposStartX; if (state_jposStartTime > -Infinity) { const cmdEndTime = state_jposStartTime + state_jposDuration; if (timeSec < cmdEndTime) { const progress = (state_jposDuration === 0) ? 1.0 : (timeSec - state_jposStartTime) / state_jposDuration; const easedProgress = calculateEasing(progress, state_jposEasing); calculatedHitX = state_jposStartX + (state_jposEndX - state_jposStartX) * easedProgress; } else { calculatedHitX = state_jposEndX; } } HIT_POSITION_X = calculatedHitX; hitCircle.style.left = (HIT_POSITION_X - 30) + 'px'; previewContainer.classList.toggle('gogo-time', state_isGogo); if (state_currentBPM !== lastBPM) lastBPM = state_currentBPM; }
-        function seekChartState(timeSec) { state_commandIndex = 0; state_currentBPM = allCourses.globalConfig.BPM || 120; state_isGogo = false; state_jposStartTime = -Infinity; state_jposDuration = 0; state_jposStartX = HIT_POSITION_X_DEFAULT; state_jposEndX = HIT_POSITION_X_DEFAULT; state_jposEasing = 0; if (!currentChart) { updateChartState(0); return; } while (state_commandIndex < currentChart.commands.length) { const cmd = currentChart.commands[state_commandIndex]; if (cmd.time > timeSec) { break; } switch (cmd.type) { case 'BPMCHANGE': state_currentBPM = cmd.value; break; case 'GOGOSTART': state_isGogo = true; break; case 'GOGOEND': state_isGogo = false; break; case 'JPOSSCROLL': if (state_jposStartTime > -Infinity) { const prevCmdEndTime = state_jposStartTime + state_jposDuration; if (cmd.time < prevCmdEndTime) { const progress = (state_jposDuration === 0) ? 1.0 : (cmd.time - state_jposStartTime) / state_jposDuration; const easedProgress = calculateEasing(progress, state_jposEasing); state_jposStartX += (state_jposEndX - state_jposStartX) * easedProgress; } else { state_jposStartX = state_jposEndX; } } state_jposStartTime = cmd.time; state_jposDuration = cmd.duration; state_jposEndX = state_jposStartX + cmd.relativeX; state_jposEasing = cmd.easing; break; } state_commandIndex++; } updateChartState(timeSec); }
+
+        function updateChartState(timeSec) { 
+            if (!currentChart) { HIT_POSITION_X = HIT_POSITION_X_DEFAULT; hitCircle.style.left = (HIT_POSITION_X_DEFAULT - 30) + 'px'; previewContainer.classList.remove('gogo-time'); return; } 
+            while (state_commandIndex < currentChart.commands.length) { 
+                const cmd = currentChart.commands[state_commandIndex]; if (cmd.time > timeSec) break; 
+                switch (cmd.type) { case 'BPMCHANGE': state_currentBPM = cmd.value; break; case 'GOGOSTART': state_isGogo = true; break; case 'GOGOEND': state_isGogo = false; break; case 'JPOSSCROLL': if (state_jposStartTime > -Infinity) { const prevCmdEndTime = state_jposStartTime + state_jposDuration; if (cmd.time < prevCmdEndTime) { const progress = (state_jposDuration === 0) ? 1.0 : (cmd.time - state_jposStartTime) / state_jposDuration; const easedProgress = calculateEasing(progress, state_jposEasing); state_jposStartX += (state_jposEndX - state_jposStartX) * easedProgress; } else { state_jposStartX = state_jposEndX; } } state_jposStartTime = cmd.time; state_jposDuration = cmd.duration; state_jposEndX = state_jposStartX + cmd.relativeX; state_jposEasing = cmd.easing; break; } state_commandIndex++; 
+            } 
+            let calculatedHitX = state_jposStartX; if (state_jposStartTime > -Infinity) { const cmdEndTime = state_jposStartTime + state_jposDuration; if (timeSec < cmdEndTime) { const progress = (state_jposDuration === 0) ? 1.0 : (timeSec - state_jposStartTime) / state_jposDuration; const easedProgress = calculateEasing(progress, state_jposEasing); calculatedHitX = state_jposStartX + (state_jposEndX - state_jposStartX) * easedProgress; } else { calculatedHitX = state_jposEndX; } } 
+            HIT_POSITION_X = calculatedHitX; hitCircle.style.left = (HIT_POSITION_X - 30) + 'px'; previewContainer.classList.toggle('gogo-time', state_isGogo); if (state_currentBPM !== lastBPM) lastBPM = state_currentBPM; 
+        }
+
+        function seekChartState(timeSec) { state_commandIndex = 0; state_currentBPM = allCourses.globalConfig.BPM || 120; state_isGogo = false; state_jposStartTime = -Infinity; state_jposDuration = 0; state_jposStartX = HIT_POSITION_X_DEFAULT; state_jposEndX = HIT_POSITION_X_DEFAULT; state_jposEasing = 0; if (!currentChart) { updateChartState(0); return; } while (state_commandIndex < currentChart.commands.length) { const cmd = currentChart.commands[state_commandIndex]; if (cmd.time > timeSec) break; switch (cmd.type) { case 'BPMCHANGE': state_currentBPM = cmd.value; break; case 'GOGOSTART': state_isGogo = true; break; case 'GOGOEND': state_isGogo = false; break; case 'JPOSSCROLL': if (state_jposStartTime > -Infinity) { const prevCmdEndTime = state_jposStartTime + state_jposDuration; if (cmd.time < prevCmdEndTime) { const progress = (state_jposDuration === 0) ? 1.0 : (cmd.time - state_jposStartTime) / state_jposDuration; const easedProgress = calculateEasing(progress, state_jposEasing); state_jposStartX += (state_jposEndX - state_jposStartX) * easedProgress; } else { state_jposStartX = state_jposEndX; } } state_jposStartTime = cmd.time; state_jposDuration = cmd.duration; state_jposEndX = state_jposStartX + cmd.relativeX; state_jposEasing = cmd.easing; break; } state_commandIndex++; } updateChartState(timeSec); }
         function showHitEffect(type) { let element, timeoutKey; switch (type) { case 'don-left': element = donEffectLeft; timeoutKey = 'donLeft'; break; case 'don-right': element = donEffectRight; timeoutKey = 'donRight'; break; case 'ka-left': element = kaEffectLeft; timeoutKey = 'kaLeft'; break; case 'ka-right': element = kaEffectRight; timeoutKey = 'kaRight'; break; default: return; } if (hitEffectTimeout[timeoutKey]) clearTimeout(hitEffectTimeout[timeoutKey]); element.classList.remove('effect-fade'); void element.offsetWidth; element.classList.add('effect-fade'); hitEffectTimeout[timeoutKey] = setTimeout(() => { element.classList.remove('effect-fade'); hitEffectTimeout[timeoutKey] = null; }, 200); }
         function showJudge(text, color) { const element = document.createElement('div'); element.className = 'judge-item'; element.textContent = text; element.style.color = color; judgeDisplay.appendChild(element); setTimeout(() => { if (element.parentElement) judgeDisplay.removeChild(element); }, 300); }
         function updateComboDisplay() { if (currentCombo < 10) { comboDisplay.style.opacity = 0; } else { comboDisplay.textContent = currentCombo; comboDisplay.style.opacity = 1; if (currentCombo >= 100) comboDisplay.style.color = '#FFD700'; else if (currentCombo >= 50) comboDisplay.style.color = '#C0C0C0'; else comboDisplay.style.color = '#FFFFFF'; } }
-        function updateMeasureDisplay() { if (!currentChart || !currentChart.allMeasureTimes) { measureDisplay.textContent = ''; return; } const currentMeasure = currentMeasureIndex; const totalMeasures = currentChart.allMeasureTimes.length - 1; measureDisplay.textContent = `${currentMeasure} / ${totalMeasures}`; }
-        function playSE(type) {
-            if (performance.now() - lastSEPlayTime[type] < 1000 / renderFPS) return;
-            if (!audioContext || !audioBuffers[type] || !seGainNode) return;
-            const source = audioContext.createBufferSource();
-            source.buffer = audioBuffers[type];
-            source.connect(seGainNode);
-            source.start(0);
-            lastSEPlayTime[type] = performance.now();
+        function updateMeasureDisplay() { if (measureDisplay.isEditing) return; if (!currentChart || !currentChart.allMeasureTimes) { measureDisplay.textContent = ''; return; } const currentMeasure = currentMeasureIndex; const totalMeasures = currentChart.allMeasureTimes.length > 0 ? currentChart.allMeasureTimes.length - 1 : 0; measureDisplay.textContent = `${currentMeasure} / ${totalMeasures}`; }
+        
+        let activeSourcesByBuffer = new Map();
+        let lastAudioPlayTime = { don: 0, ka: 0, balloon: 0 }; 
+        
+        function playSE(type) { 
+            if (!audioContext || !seGainNode) return; 
+            
+            const now = audioContext.currentTime;
+            const minInterval = 1.0 / renderFPS;
+            if (now - (lastAudioPlayTime[type] || 0) < minInterval) return;
+            lastAudioPlayTime[type] = now;
+
+            let buffer = audioBuffers[type]; 
+            if (!buffer && type === 'balloon') buffer = audioBuffers['don']; 
+            if (!buffer) return; 
+            
+            if (activeSourcesByBuffer.has(buffer)) { 
+                try { const oldSource = activeSourcesByBuffer.get(buffer); oldSource.stop(0); oldSource.disconnect(); } catch(e) {} 
+            } 
+            const source = audioContext.createBufferSource(); 
+            source.buffer = buffer; source.connect(seGainNode); source.start(0); 
+            activeSourcesByBuffer.set(buffer, source); 
         }
-        function autoHitCheck(elapsedTime) { if (!currentChart) return; for (const note of currentChart.notes) { if (note.judgeResult !== 'pending') continue; if (note.type === '7' && note.hits === 0 && elapsedTime >= note.time) { note.judgeResult = 'hit'; continue; } if (note.type >= '5' && note.type <= '7') { if (elapsedTime >= note.time && elapsedTime <= note.endTime) { if (note.lastAutoHitTime === 0) note.lastAutoHitTime = note.time; const hitInterval = 1.0 / autoRollSpeed; const timeSinceLastHit = elapsedTime - note.lastAutoHitTime; if (timeSinceLastHit >= hitInterval) { const hits = Math.floor(timeSinceLastHit / hitInterval); note.lastAutoHitTime += (hitInterval * hits); note.currentHits += hits; const timeSinceLastEffect = elapsedTime - lastAutoEffectTime; const skipEffect = timeSinceLastEffect < (1.0 / 60.0); if (!skipEffect) lastAutoEffectTime = elapsedTime; let noteHitType = 'don'; playSE(noteHitType); if (note.currentHits % 2 === 1) { if (!skipEffect) showHitEffect(noteHitType + '-left'); } else { if (!skipEffect) showHitEffect(noteHitType + '-right'); } if (note.type === '7' && note.hits > 0 && note.currentHits >= note.hits) { note.judgeResult = 'hit'; playSE('balloon'); } } } else if (elapsedTime > note.endTime) { if (note.type === '5' || note.type === '6') note.judgeResult = 'hit'; } } else if (note.type !== 'BARLINE') { if (elapsedTime >= note.time) { note.judgeResult = 'hit'; const timeSinceLastEffect = elapsedTime - lastAutoEffectTime; const skipEffect = timeSinceLastEffect < (1.0 / 60.0); if (!skipEffect) lastAutoEffectTime = elapsedTime; if (note.type === '1') { playSE('don'); if (currentCombo % 2 === 0) { if (!skipEffect) showHitEffect('don-left'); } else { if (!skipEffect) showHitEffect('don-right'); } } else if (note.type === '3') { playSE('don'); if (!skipEffect) { showHitEffect('don-left'); showHitEffect('don-right'); } } else if (note.type === '2') { playSE('ka'); if (currentCombo % 2 === 0) { if (!skipEffect) showHitEffect('ka-left'); } else { if (!skipEffect) showHitEffect('ka-right'); } } else if (note.type === '4') { playSE('ka'); if (!skipEffect) { showHitEffect('ka-left'); showHitEffect('ka-right'); } } currentCombo++; updateComboDisplay(); if (!skipEffect) showJudge('良', '#FFD700'); } else if (elapsedTime > note.time + JUDGE_BAD) { note.judgeResult = 'miss'; currentCombo = 0; updateComboDisplay(); } } } }
-        function playerMissCheck(elapsedTime) { if (!currentChart) return; for (const note of currentChart.notes) { if (note.judgeResult !== 'pending' || (note.type >= '5' && note.type <= '7') || note.type === 'BARLINE') continue; if (note.type === '7' && note.hits === 0 && elapsedTime >= note.time) { note.judgeResult = 'hit'; continue; } const diff = note.time - elapsedTime; if (diff < -JUDGE_BAD) { note.judgeResult = 'miss'; currentCombo = 0; updateComboDisplay(); } } }
-        function drawNoteStroke(noteType, x, y) { 
-            let whiteWidth, blackWidth; 
-            if (noteType === '3' || noteType === '4' || noteType === '6' || noteType === '7') { whiteWidth = 6; blackWidth = 1.5; } else { whiteWidth = 4; blackWidth = 1; } 
-            const size = NOTE_SIZE[noteType]; 
-            ctx.lineWidth = whiteWidth; 
-            ctx.strokeStyle = '#FFFFFF'; 
-            ctx.stroke(); 
-            ctx.beginPath(); 
-            ctx.arc(x, y, size + (whiteWidth / 2) + (blackWidth / 2), 0, Math.PI * 2); 
-            ctx.lineWidth = blackWidth; 
-            ctx.strokeStyle = '#000000'; 
-            ctx.stroke(); 
+
+        function autoHitCheck(elapsedTime) {
+            if (!currentChart) return;
+            const notes = currentChart.regularArr; const n = notes.length; let start = currentChart._autoCheckStart;
+            while (start < n && notes[start].judgeResult !== 'pending') start++;
+            currentChart._autoCheckStart = start;
+
+            for (let i = start; i < n; i++) {
+                const note = notes[i];
+                if (note.type === '0') continue;
+                if (note.type < '5' && note.time > elapsedTime + 0.5) break;
+                if (note.type >= '5' && note.type <= '7' && note.time > elapsedTime + 0.5 && note.judgeResult === 'pending') break;
+                if (note.judgeResult !== 'pending') continue;
+                if (note.type === '7' && note.hits === 0 && elapsedTime >= note.time) { note.judgeResult = 'hit'; continue; }
+                if (note.type >= '5' && note.type <= '7') { 
+                    if (elapsedTime >= note.time && elapsedTime <= note.endTime) { 
+                        if (note.lastAutoHitTime === 0) note.lastAutoHitTime = note.time; 
+                        const hitInterval = 1.0 / autoRollSpeed; 
+                        const timeSinceLastHit = elapsedTime - note.lastAutoHitTime; 
+                        if (timeSinceLastHit >= hitInterval) { 
+                            const hits = Math.floor(timeSinceLastHit / hitInterval); 
+                            note.lastAutoHitTime += (hitInterval * hits); note.currentHits += hits; 
+                            const timeSinceLastEffect = elapsedTime - lastAutoEffectTime; const skipEffect = timeSinceLastEffect < (1.0 / 60.0); 
+                            if (!skipEffect) lastAutoEffectTime = elapsedTime; 
+                            let noteHitType = 'don'; 
+                            
+                            if (note.currentHits % 2 === 1) { if (!skipEffect) showHitEffect(noteHitType + '-left'); } else { if (!skipEffect) showHitEffect(noteHitType + '-right'); } 
+                            if (note.type === '7' && note.hits > 0 && note.currentHits >= note.hits) { 
+                                note.judgeResult = 'hit'; 
+                                if (!autoSeSourceNode) playSE('balloon'); 
+                            } 
+                        } 
+                    } else if (elapsedTime > note.endTime) { if (note.type === '5' || note.type === '6') note.judgeResult = 'hit'; } 
+                } else { 
+                    if (elapsedTime >= note.time) { 
+                        note.judgeResult = 'hit'; const timeSinceLastEffect = elapsedTime - lastAutoEffectTime; const skipEffect = timeSinceLastEffect < (1.0 / 60.0); 
+                        if (!skipEffect) lastAutoEffectTime = elapsedTime; 
+                        if (note.type === '1') { 
+                            if (!autoSeSourceNode) playSE('don'); 
+                            if (currentCombo % 2 === 0) { if (!skipEffect) showHitEffect('don-left'); } else { if (!skipEffect) showHitEffect('don-right'); } 
+                        } else if (note.type === '3') { 
+                            if (!autoSeSourceNode) playSE('don'); 
+                            if (!skipEffect) { showHitEffect('don-left'); showHitEffect('don-right'); } 
+                        } else if (note.type === '2') { 
+                            if (!autoSeSourceNode) playSE('ka'); 
+                            if (currentCombo % 2 === 0) { if (!skipEffect) showHitEffect('ka-left'); } else { if (!skipEffect) showHitEffect('ka-right'); } 
+                        } else if (note.type === '4') { 
+                            if (!autoSeSourceNode) playSE('ka'); 
+                            if (!skipEffect) { showHitEffect('ka-left'); showHitEffect('ka-right'); } 
+                        } 
+                        currentCombo++; updateComboDisplay(); if (!skipEffect) showJudge('良', '#FFD700'); 
+                    } else if (elapsedTime > note.time + JUDGE_BAD) { note.judgeResult = 'miss'; currentCombo = 0; updateComboDisplay(); } 
+                }
+            }
         }
+        function playerMissCheck(elapsedTime) {
+            if (!currentChart) return;
+            const notes = currentChart.regularArr; const n = notes.length; let start = currentChart._autoCheckStart;
+            while (start < n && notes[start].judgeResult !== 'pending') start++;
+            currentChart._autoCheckStart = start;
+            for (let i = start; i < n; i++) {
+                const note = notes[i];
+                if (note.type === '0') continue;
+                if (note.time > elapsedTime + 0.5) break;
+                if (note.judgeResult !== 'pending' || (note.type >= '5' && note.type <= '7')) continue;
+                if (note.type === '7' && note.hits === 0 && elapsedTime >= note.time) { note.judgeResult = 'hit'; continue; }
+                const diff = note.time - elapsedTime;
+                if (diff < -JUDGE_BAD) { note.judgeResult = 'miss'; currentCombo = 0; updateComboDisplay(); }
+            }
+        }
+        function drawNoteStroke(noteType, x, y) { let whiteWidth, blackWidth; if (noteType === '3' || noteType === '4' || noteType === '6' || noteType === '7') { whiteWidth = 6; blackWidth = 1.5; } else { whiteWidth = 4; blackWidth = 1; } const size = NOTE_SIZE[noteType]; ctx.lineWidth = whiteWidth; ctx.strokeStyle = '#FFFFFF'; ctx.stroke(); ctx.beginPath(); ctx.arc(x, y, size + (whiteWidth / 2) + (blackWidth / 2), 0, Math.PI * 2); ctx.lineWidth = blackWidth; ctx.strokeStyle = '#000000'; ctx.stroke(); }
         
         function updateLogic() {
-            if (audioContext) {
-                currentElapsedTime = simulationStartOffset + (audioContext.currentTime - simulationStartTime);
-            } else {
-                currentElapsedTime += (1000 / 240) / 1000.0;
-            }
-
-            if (chartCoolDownUntil !== null && currentElapsedTime >= chartCoolDownUntil) {
-                chartCoolDownUntil = null;
-            }
-            if (currentChart.endTime > 0 && currentElapsedTime > currentChart.endTime + 1.0) {
-                if (currentChart.allMeasureTimes.length > 0) {
-                    currentElapsedTime = currentChart.allMeasureTimes[currentChart.allMeasureTimes.length - 1];
-                    currentMeasureIndex = currentChart.allMeasureTimes.length - 1;
-                } else {
-                    currentElapsedTime = 0;
-                    currentMeasureIndex = 0;
-                }
-                stopSimulation();
-                return;
-            }
-            if (stopAtTime !== null && currentElapsedTime >= stopAtTime) {
-                stopSimulation();
-                currentElapsedTime = stopAtTime;
-                updatePreview(currentElapsedTime);
-                return;
-            }
+            if (audioContext) { currentElapsedTime = simulationStartOffset + (audioContext.currentTime - simulationStartTime); } else { currentElapsedTime += (1000 / renderFPS) / 1000.0; }
+            if (chartCoolDownUntil !== null && currentElapsedTime >= chartCoolDownUntil) { chartCoolDownUntil = null; }
+            if (currentChart.measureEndTime > 0 && currentElapsedTime > currentChart.measureEndTime + 1.0) { if (currentChart.allMeasureTimes.length > 0) { currentElapsedTime = currentChart.allMeasureTimes[currentChart.allMeasureTimes.length - 1]; currentMeasureIndex = currentChart.allMeasureTimes.length - 1; } else { currentElapsedTime = 0; currentMeasureIndex = 0; } stopSimulation(); return; }
+            if (stopAtTime !== null && currentElapsedTime >= stopAtTime) { stopSimulation(); currentElapsedTime = stopAtTime; updatePreview(currentElapsedTime); return; }
             updateChartState(currentElapsedTime);
-            if (chartCoolDownUntil === null) {
-                if (isAutoPlay) autoHitCheck(currentElapsedTime);
-                else playerMissCheck(currentElapsedTime);
-            }
+            if (chartCoolDownUntil === null) { if (isAutoPlay) autoHitCheck(currentElapsedTime); else playerMissCheck(currentElapsedTime); }
         }
         
-        function drawLoop(timestamp) {
+        function drawLoop() {
             if (!isPlaying) return;
             animationFrameId = requestAnimationFrame(drawLoop);
-            const elapsed = timestamp - lastFrameTime;
-            if (elapsed < 1000 / renderFPS) return;
-            lastFrameTime = timestamp - (elapsed % (1000 / renderFPS));
         
             ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+            drawWaveform(currentElapsedTime);
+
             const baseCenterY = canvas.clientHeight / 2;
+            const canvasWidth = canvas.clientWidth, canvasHeight = canvas.clientHeight;
             const canvasMargin = 100;
             let activeRollNote = null;
-            let notesWithState = currentChart.notes.map((note, index) => ({ note, index }));
-            notesWithState.sort((a, b) => {
-                const isABarline = a.note.type === 'BARLINE', isBBarline = b.note.type === 'BARLINE';
-                if (isABarline && !isBBarline) return -1;
-                if (!isABarline && isBBarline) return 1;
-                if (isABarline && isBBarline) return b.note.time - a.note.time;
-                if (a.note.time !== b.note.time) return b.note.time - a.note.time;
-                return b.index - a.index;
-            });
-            for (const { note } of notesWithState) {
-                if (chartCoolDownUntil !== null && note.time < chartCoolDownUntil && note.type !== 'BARLINE') {
-                    if (note.type >= '5' && note.type <= '7' && note.endTime > currentElapsedTime) { }
-                    else { continue; }
-                }
-                const { bpm, scroll, scrollY } = note;
-                const pixelsPerSecondX = BASE_SCROLL_FACTOR * bpm * scroll * scrollMultiplier;
-                const pixelsPerSecondY = BASE_SCROLL_FACTOR * bpm * scrollY * scrollMultiplier;
-                const timeDiff = note.time - currentElapsedTime;
-                const x = HIT_POSITION_X + timeDiff * pixelsPerSecondX;
-                const y = baseCenterY + timeDiff * pixelsPerSecondY;
+
+            const chart = currentChart;
+            if (!chart) return;
+
+            const LOOK_BEHIND = 5.0;
+            const tMin = currentElapsedTime - LOOK_BEHIND;
+
+            const barlines = chart.barlineArr;
+            const bLo = lowerBound(barlines, tMin);
+            // 未来側の足切り(tMax)を撤廃し全ループ、ただしオブジェクト生成を避けてインライン展開
+            for (let i = barlines.length - 1; i >= bLo; i--) {
+                const note = barlines[i];
+                if (!note.barlineVisible) continue;
                 
-                if (note.type === 'BARLINE') { 
-                    if (!note.barlineVisible || (x < -canvasMargin || x > canvas.clientWidth + canvasMargin || y < -canvasMargin || y > canvas.clientHeight + canvasMargin) || (pixelsPerSecondX === 0 && pixelsPerSecondY === 0)) continue; 
-                    const angle = Math.atan2(pixelsPerSecondY, pixelsPerSecondX), normalAngle = angle + Math.PI / 2; 
-                    const dx = Math.cos(normalAngle), dy = Math.sin(normalAngle); 
-                    const lineHalfLength = canvas.clientHeight / 2; 
-                    const scaledDx = dx * lineHalfLength, scaledDy = dy * lineHalfLength; 
-                    ctx.beginPath(); 
-                    ctx.moveTo(x - scaledDx, y - scaledDy); 
-                    ctx.lineTo(x + scaledDx, y + scaledDy); 
-                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)'; 
-                    ctx.lineWidth = 2; 
-                    ctx.stroke(); 
-                } else if (note.type >= '1' && note.type <= '4') { 
-                    if (note.judgeResult === 'hit' || (x < -canvasMargin || x > canvas.clientWidth + canvasMargin || y < -canvasMargin || y > canvas.clientHeight + canvasMargin)) continue; 
-                    const size = NOTE_SIZE[note.type], color = NOTE_COLORS[note.type]; 
-                    ctx.beginPath(); 
-                    ctx.arc(x, y, size, 0, Math.PI * 2); 
-                    ctx.fillStyle = color; 
-                    ctx.fill(); 
-                    drawNoteStroke(note.type, x, y); 
-                } else if (note.type === '5' || note.type === '6') { 
-                    const pixelsPerSecondX_End = BASE_SCROLL_FACTOR * bpm * scroll * scrollMultiplier, pixelsPerSecondY_End = BASE_SCROLL_FACTOR * bpm * scrollY * scrollMultiplier; 
-                    const endTimeDiff = note.endTime - currentElapsedTime; 
-                    const endX = HIT_POSITION_X + endTimeDiff * pixelsPerSecondX_End, endY = baseCenterY + endTimeDiff * pixelsPerSecondY_End; 
-                    if ((x < -canvasMargin && endX < -canvasMargin) || (x > canvas.clientWidth + canvasMargin && endX > canvas.clientWidth + canvasMargin) || (y < -canvasMargin && endY < -canvasMargin) || (y > canvas.clientHeight + canvasMargin && endY > canvas.clientHeight + canvasMargin)) continue; 
-                    if (currentElapsedTime >= note.time && currentElapsedTime <= note.endTime) activeRollNote = note; 
-                    const size = NOTE_SIZE[note.type], color = NOTE_COLORS[note.type]; 
-                    ctx.beginPath(); 
-                    ctx.moveTo(x, y); 
-                    ctx.lineTo(endX, endY); 
-                    ctx.strokeStyle = color; 
-                    ctx.lineWidth = size * 2; 
-                    ctx.stroke(); 
-                    ctx.beginPath(); 
-                    ctx.arc(endX, endY, size, 0, Math.PI * 2); 
-                    ctx.fillStyle = color; 
-                    ctx.fill(); 
-                    ctx.beginPath(); 
-                    ctx.arc(x, y, size, 0, Math.PI * 2); 
-                    ctx.fillStyle = color; 
-                    ctx.fill(); 
-                    drawNoteStroke(note.type, x, y); 
-                } else if (note.type === '7') { 
-                    if (note.judgeResult === 'hit' || note.judgeResult === 'miss') continue; 
-                    const pixelsPerSecondX_End = BASE_SCROLL_FACTOR * bpm * scroll * scrollMultiplier, pixelsPerSecondY_End = BASE_SCROLL_FACTOR * bpm * scrollY * scrollMultiplier; 
-                    const endTimeDiff = note.endTime - currentElapsedTime; 
-                    const endX = HIT_POSITION_X + endTimeDiff * pixelsPerSecondX_End, endY = baseCenterY + endTimeDiff * pixelsPerSecondY_End; 
-                    let displayX = x, displayY = y, stayAtHitPos = false; 
-                    if (note.judgeResult === 'pending') { 
-                        if (currentElapsedTime <= note.endTime) { 
-                            if (pixelsPerSecondX > 0) { 
-                                if (x <= HIT_POSITION_X && endX > HIT_POSITION_X) stayAtHitPos = true; 
-                            } else if (pixelsPerSecondX < 0) { 
-                                if (x >= HIT_POSITION_X && endX < HIT_POSITION_X) stayAtHitPos = true; 
-                            } else if (pixelsPerSecondY !== 0) { 
-                                if (pixelsPerSecondY > 0) { 
-                                    if (y >= baseCenterY && endY > baseCenterY) stayAtHitPos = true; 
-                                } else { 
-                                    if (y <= baseCenterY && endY < baseCenterY) stayAtHitPos = true; 
-                                } 
-                            } 
-                            if (stayAtHitPos) { 
-                                displayX = HIT_POSITION_X; 
-                                if (pixelsPerSecondX !== 0) { 
-                                    const timeToHitX = (HIT_POSITION_X - x) / pixelsPerSecondX, displayTime = note.time + timeToHitX; 
-                                    const displayTimeDiff = displayTime - currentElapsedTime; 
-                                    const stopPixelsPerSecondY = BASE_SCROLL_FACTOR * note.bpm * note.scrollY * scrollMultiplier; 
-                                    displayY = baseCenterY + displayTimeDiff * stopPixelsPerSecondY; 
-                                } else { 
-                                    displayY = baseCenterY; 
-                                } 
-                            } 
-                            activeRollNote = note; 
-                        } else { 
-                            displayX = endX; 
-                            displayY = endY; 
-                        } 
-                    } 
-                    if (displayX > canvas.clientWidth + canvasMargin || displayX < -canvasMargin || displayY > canvas.clientHeight + canvasMargin || displayY < -canvasMargin) continue; 
-                    const size = NOTE_SIZE[note.type], color = NOTE_COLORS[note.type]; 
-                    ctx.beginPath(); 
-                    ctx.arc(displayX, displayY, size, 0, Math.PI * 2); 
-                    ctx.fillStyle = color; 
-                    ctx.fill(); 
-                    drawNoteStroke(note.type, displayX, displayY); 
-                    const remainingHits = note.hits - note.currentHits; 
-                    ctx.fillStyle = 'white'; 
-                    ctx.font = 'bold 18px Inter'; 
-                    ctx.textAlign = 'center'; 
-                    ctx.textBaseline = 'middle'; 
-                    if (note.hits > 0 && note.judgeResult === 'pending') ctx.fillText(remainingHits.toString(), displayX, displayY); 
+                let currentBpmScroll = note.bpm * note.scroll;
+                let currentBpmScrollY = note.bpm * note.scrollY;
+                if (isFixedBpmEnabled || isWaveformEnabled) {
+                    currentBpmScroll = fixedBpmValue;
+                    currentBpmScrollY = (note.bpm !== 0) ? note.scrollY * (fixedBpmValue / note.bpm) : 0;
+                }
+                const ppsX = BASE_SCROLL_FACTOR * currentBpmScroll * scrollMultiplier;
+                const ppsY = BASE_SCROLL_FACTOR * currentBpmScrollY * scrollMultiplier;
+                
+                if (ppsX === 0 && ppsY === 0) continue;
+                const timeDiff = note.time - currentElapsedTime;
+                const x = HIT_POSITION_X + timeDiff * ppsX, y = baseCenterY + timeDiff * ppsY;
+                if (x < -canvasMargin || x > canvasWidth + canvasMargin || y < -canvasMargin || y > canvasHeight + canvasMargin) continue;
+                
+                const angle = Math.atan2(ppsY, ppsX), normalAngle = angle + Math.PI / 2;
+                const dx = Math.cos(normalAngle) * (canvasHeight / 2), dy = Math.sin(normalAngle) * (canvasHeight / 2);
+                ctx.beginPath(); ctx.moveTo(x - dx, y - dy); ctx.lineTo(x + dx, y + dy);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)'; ctx.lineWidth = 2; ctx.stroke();
+            }
+
+            const regular = chart.regularArr;
+            const rLo = lowerBound(regular, tMin - 30.0);
+            
+            if (showGridLines) {
+                for (let i = regular.length - 1; i >= rLo; i--) {
+                    const note = regular[i];
+                    
+                    let currentBpmScroll = note.bpm * note.scroll;
+                    if (isFixedBpmEnabled || isWaveformEnabled) currentBpmScroll = fixedBpmValue;
+                    const ppsX = BASE_SCROLL_FACTOR * currentBpmScroll * scrollMultiplier;
+                    
+                    const timeDiff = note.time - currentElapsedTime;
+                    const x = HIT_POSITION_X + timeDiff * ppsX;
+                    if (x < -canvasMargin || x > canvasWidth + canvasMargin) continue;
+                    
+                    ctx.beginPath(); ctx.moveTo(x, baseCenterY - 40); ctx.lineTo(x, baseCenterY + 40);
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)'; ctx.lineWidth = 1; ctx.stroke();
+                }
+            }
+
+            for (let i = regular.length - 1; i >= rLo; i--) {
+                const note = regular[i];
+                if (note.type === '0') continue;
+                if (chartCoolDownUntil !== null && note.time < chartCoolDownUntil) { if (note.type >= '5' && note.type <= '7' && note.endTime > currentElapsedTime) {  } else { continue; } }
+                
+                let currentBpmScroll = note.bpm * note.scroll;
+                let currentBpmScrollY = note.bpm * note.scrollY;
+                if (isFixedBpmEnabled || isWaveformEnabled) {
+                    currentBpmScroll = fixedBpmValue;
+                    currentBpmScrollY = (note.bpm !== 0) ? note.scrollY * (fixedBpmValue / note.bpm) : 0;
+                }
+                const ppsX = BASE_SCROLL_FACTOR * currentBpmScroll * scrollMultiplier;
+                const ppsY = BASE_SCROLL_FACTOR * currentBpmScrollY * scrollMultiplier;
+                
+                const timeDiff = note.time - currentElapsedTime;
+                const x = HIT_POSITION_X + timeDiff * ppsX, y = baseCenterY + timeDiff * ppsY;
+
+                if (note.type >= '1' && note.type <= '4') {
+                    if (note.judgeResult === 'hit' || (x < -canvasMargin || x > canvasWidth + canvasMargin || y < -canvasMargin || y > canvasHeight + canvasMargin)) continue;
+                    const size = NOTE_SIZE[note.type], color = NOTE_COLORS[note.type];
+                    ctx.beginPath(); ctx.arc(x, y, size, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill();
+                    drawNoteStroke(note.type, x, y);
+                } else if (note.type === '5' || note.type === '6') {
+                    const endTimeDiff = note.endTime - currentElapsedTime;
+                    const endX = HIT_POSITION_X + endTimeDiff * ppsX, endY = baseCenterY + endTimeDiff * ppsY;
+                    if ((x < -canvasMargin && endX < -canvasMargin) || (x > canvasWidth + canvasMargin && endX > canvasWidth + canvasMargin) || (y < -canvasMargin && endY < -canvasMargin) || (y > canvasHeight + canvasMargin && endY > canvasHeight + canvasMargin)) continue;
+                    if (currentElapsedTime >= note.time && currentElapsedTime <= note.endTime) activeRollNote = note;
+                    const size = NOTE_SIZE[note.type], color = NOTE_COLORS[note.type];
+                    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(endX, endY); ctx.strokeStyle = color; ctx.lineWidth = size * 2; ctx.stroke();
+                    ctx.beginPath(); ctx.arc(endX, endY, size, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill();
+                    ctx.beginPath(); ctx.arc(x, y, size, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill();
+                    drawNoteStroke(note.type, x, y);
+                } else if (note.type === '7') {
+                    if (note.judgeResult === 'hit' || note.judgeResult === 'miss') continue;
+                    const endTimeDiff = note.endTime - currentElapsedTime;
+                    const endX = HIT_POSITION_X + endTimeDiff * ppsX, endY = baseCenterY + endTimeDiff * ppsY;
+                    let displayX = x, displayY = y, stayAtHitPos = false;
+                    if (note.judgeResult === 'pending') {
+                        if (currentElapsedTime <= note.endTime) {
+                            if (ppsX > 0) { if (x <= HIT_POSITION_X && endX > HIT_POSITION_X) stayAtHitPos = true; }
+                            else if (ppsX < 0) { if (x >= HIT_POSITION_X && endX < HIT_POSITION_X) stayAtHitPos = true; }
+                            else if (ppsY !== 0) { if (ppsY > 0) { if (y >= baseCenterY && endY > baseCenterY) stayAtHitPos = true; } else { if (y <= baseCenterY && endY < baseCenterY) stayAtHitPos = true; } }
+                            if (stayAtHitPos) { displayX = HIT_POSITION_X; if (ppsX !== 0) { const timeToHitX = (HIT_POSITION_X - x) / ppsX, displayTime = note.time + timeToHitX; const displayTimeDiff = displayTime - currentElapsedTime; displayY = baseCenterY + displayTimeDiff * ppsY; } else { displayY = baseCenterY; } }
+                            activeRollNote = note;
+                        } else { displayX = endX; displayY = endY; }
+                    }
+                    if (displayX > canvasWidth + canvasMargin || displayX < -canvasMargin || displayY > canvasHeight + canvasMargin || displayY < -canvasMargin) continue;
+                    const size = NOTE_SIZE[note.type], color = NOTE_COLORS[note.type];
+                    ctx.beginPath(); ctx.arc(displayX, displayY, size, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill();
+                    drawNoteStroke(note.type, displayX, displayY);
+                    const remainingHits = note.hits - note.currentHits;
+                    ctx.fillStyle = 'white'; ctx.font = 'bold 18px Inter'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    if (note.hits > 0 && note.judgeResult === 'pending') ctx.fillText(remainingHits.toString(), displayX, displayY);
                 }
             }
             if (activeRollNote && activeRollNote.type !== '7') { rollCountDisplay.textContent = activeRollNote.currentHits; rollCountDisplay.style.opacity = 1; if (activeRollNote.type === '6') rollCountDisplay.style.color = NOTE_COLORS['6']; else rollCountDisplay.style.color = NOTE_COLORS['5']; } else { rollCountDisplay.style.opacity = 0; }
             currentMeasureIndex = findMeasureIndex(currentElapsedTime);
             updateMeasureDisplay();
         }
+
         function updatePreview(time = currentElapsedTime) { 
             if (!currentChart) { ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight); seekChartState(0); return; } 
-            resizeCanvas(); 
-            seekChartState(time); 
-            const elapsedTime = time, baseCenterY = canvas.clientHeight / 2; 
-            const canvasMargin = 100; 
-            ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight); 
-            let notesWithState = currentChart.notes.map((note, index) => ({ note, index }));
-            notesWithState.sort((a, b) => {
-                const isABarline = a.note.type === 'BARLINE', isBBarline = b.note.type === 'BARLINE';
-                if (isABarline && !isBBarline) return -1;
-                if (!isABarline && isBBarline) return 1;
-                if (isABarline && isBBarline) return b.note.time - a.note.time;
-                if (a.note.time !== b.note.time) return b.note.time - a.note.time;
-                return b.index - a.index;
-            });
-            for (const { note } of notesWithState) { 
-                const { bpm, scroll, scrollY } = note; 
-                const pixelsPerSecondX = BASE_SCROLL_FACTOR * bpm * scroll * scrollMultiplier, pixelsPerSecondY = BASE_SCROLL_FACTOR * bpm * scrollY * scrollMultiplier; 
-                const timeDiff = note.time - elapsedTime; 
-                const x = HIT_POSITION_X + timeDiff * pixelsPerSecondX, y = baseCenterY + timeDiff * pixelsPerSecondY; 
-                if (note.type < '5' || (note.type === '7' && (note.judgeResult === 'hit' || note.judgeResult === 'miss'))) { 
-                    if (x < -canvasMargin || x > canvas.clientWidth + canvasMargin || y < -canvasMargin || y > canvas.clientHeight + canvasMargin) continue; 
-                } 
-                if (note.type === '5' || note.type === '6' || (note.type === '7' && note.judgeResult === 'pending')) { 
-                    const pixelsPerSecondX_End = BASE_SCROLL_FACTOR * bpm * scroll * scrollMultiplier, pixelsPerSecondY_End = BASE_SCROLL_FACTOR * bpm * scrollY * scrollMultiplier; 
-                    const endTimeDiff = note.endTime - elapsedTime; 
-                    const endX = HIT_POSITION_X + endTimeDiff * pixelsPerSecondX_End, endY = baseCenterY + endTimeDiff * pixelsPerSecondY_End; 
-                    if ((x < -canvasMargin && endX < -canvasMargin) || (x > canvas.clientWidth + canvasMargin && endX > canvas.clientWidth + canvasMargin) || (y < -canvasMargin && endY < -canvasMargin) || (y > canvas.clientHeight + canvasMargin && endY > canvas.clientHeight + canvasMargin)) continue; 
-                } 
-                const size = NOTE_SIZE[note.type] || NOTE_SIZE['1'], color = NOTE_COLORS[note.type] || '#FFFFFF'; 
-                if (note.type === 'BARLINE') { 
-                    if (!note.barlineVisible || (pixelsPerSecondX === 0 && pixelsPerSecondY === 0)) continue; 
-                    const angle = Math.atan2(pixelsPerSecondY, pixelsPerSecondX), normalAngle = angle + Math.PI / 2; 
-                    const dx = Math.cos(normalAngle), dy = Math.sin(normalAngle); 
-                    const lineHalfLength = canvas.clientHeight / 2, scaledDx = dx * lineHalfLength, scaledDy = dy * lineHalfLength; 
-                    ctx.beginPath(); 
-                    ctx.moveTo(x - scaledDx, y - scaledDy); 
-                    ctx.lineTo(x + scaledDx, y + scaledDy); 
-                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)'; 
-                    ctx.lineWidth = 2; 
-                    ctx.stroke(); 
-                } else if (note.judgeResult === 'hit' && (note.type >= '1' && note.type <= '4')) { 
-                    continue; 
-                } else if (note.type === '7') { 
-                    if (note.judgeResult === 'hit' || note.judgeResult === 'miss') continue; 
-                    const pixelsPerSecondX_End = BASE_SCROLL_FACTOR * bpm * scroll * scrollMultiplier, pixelsPerSecondY_End = BASE_SCROLL_FACTOR * bpm * scrollY * scrollMultiplier; 
-                    const endTimeDiff = note.endTime - elapsedTime; 
-                    const endX = HIT_POSITION_X + endTimeDiff * pixelsPerSecondX_End, endY = baseCenterY + endTimeDiff * pixelsPerSecondY_End; 
-                    let displayX = x, displayY = y, stayAtHitPos = false; 
-                    if (note.judgeResult === 'pending') { 
-                        if (elapsedTime <= note.endTime) { 
-                            if (pixelsPerSecondX > 0) { 
-                                if (x <= HIT_POSITION_X && endX > HIT_POSITION_X) stayAtHitPos = true; 
-                            } else if (pixelsPerSecondX < 0) { 
-                                if (x >= HIT_POSITION_X && endX < HIT_POSITION_X) stayAtHitPos = true; 
-                            } else if (pixelsPerSecondY !== 0) { 
-                                if (pixelsPerSecondY > 0) { 
-                                    if (y >= baseCenterY && endY > baseCenterY) stayAtHitPos = true; 
-                                } else { 
-                                    if (y <= baseCenterY && endY < baseCenterY) stayAtHitPos = true; 
-                                } 
-                            } 
-                            if (stayAtHitPos) { 
-                                displayX = HIT_POSITION_X; 
-                                if (pixelsPerSecondX !== 0) { 
-                                    const timeToHitX = (HIT_POSITION_X - x) / pixelsPerSecondX, displayTime = note.time + timeToHitX; 
-                                    const displayTimeDiff = displayTime - elapsedTime; 
-                                    const stopPixelsPerSecondY = BASE_SCROLL_FACTOR * note.bpm * note.scrollY * scrollMultiplier; 
-                                    displayY = baseCenterY + displayTimeDiff * stopPixelsPerSecondY; 
-                                } else { 
-                                    displayY = baseCenterY; 
-                                } 
-                            } 
-                        } else { 
-                            displayX = endX; displayY = endY; 
-                        } 
-                    } 
-                    if (displayX > canvas.clientWidth + canvasMargin || displayX < -canvasMargin || displayY > canvas.clientHeight + canvasMargin || displayY < -canvasMargin) continue; 
-                    ctx.beginPath(); ctx.arc(displayX, displayY, size, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill(); drawNoteStroke(note.type, displayX, displayY); ctx.fillStyle = 'white'; ctx.font = 'bold 18px Inter'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; if (note.hits > 0) ctx.fillText(note.hits.toString(), displayX, displayY); 
-                } else if (note.type === '5' || note.type === '6') { 
-                    const pixelsPerSecondX_End = BASE_SCROLL_FACTOR * bpm * scroll * scrollMultiplier, pixelsPerSecondY_End = BASE_SCROLL_FACTOR * bpm * scrollY * scrollMultiplier; 
-                    const endTimeDiff = note.endTime - elapsedTime; 
-                    const endX = HIT_POSITION_X + endTimeDiff * pixelsPerSecondX_End, endY = baseCenterY + endTimeDiff * pixelsPerSecondY_End; 
-                    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(endX, endY); ctx.strokeStyle = color; ctx.lineWidth = size * 2; ctx.stroke(); ctx.beginPath(); ctx.arc(endX, endY, size, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill(); ctx.beginPath(); ctx.arc(x, y, size, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill(); drawNoteStroke(note.type, x, y); 
-                } else { 
-                    ctx.beginPath(); ctx.arc(x, y, size, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill(); drawNoteStroke(note.type, x, y); 
-                } 
-            } 
-        }
-        function setChartTime(time) { if (!currentChart) { currentElapsedTime = 0; currentMeasureIndex = 0; currentCombo = 0; updateComboDisplay(); updateMeasureDisplay(); seekChartState(0); updatePreview(0); return; } const wasPlaying = isPlaying; if (wasPlaying) stopSimulation(); currentElapsedTime = time; currentMeasureIndex = findMeasureIndex(time); let initialCombo = 0; currentChart.notes.forEach(note => { if (note.time < time) { if ((note.type >= '5' && note.type <= '7') && note.endTime > time) { note.judgeResult = 'pending'; note.currentHits = 0; note.lastAutoHitTime = 0; } else { note.judgeResult = 'hit'; if (note.type === '1' || note.type === '2' || note.type === '3' || note.type === '4') initialCombo++; if (note.type === '7' && note.hits > 0) note.currentHits = note.hits; if (note.type === '5' || note.type === '6') { const duration = note.endTime - note.time; note.currentHits = Math.floor(duration / (1.0 / autoRollSpeed)); } } } else { note.judgeResult = 'pending'; note.currentHits = 0; note.lastAutoHitTime = 0; } }); currentCombo = initialCombo; updateComboDisplay(); updateMeasureDisplay(); seekChartState(currentElapsedTime); updatePreview(currentElapsedTime); if (wasPlaying) { const targetTime = currentElapsedTime; if (targetTime === 0) { chartCoolDownUntil = coolDownTime; currentElapsedTime = 0; } else { currentElapsedTime = Math.max(0, targetTime - coolDownTime); chartCoolDownUntil = targetTime; } seekChartState(currentElapsedTime); stopAtTime = null; startSimulation(); } }
-        
-        async function startSimulation() {
-            if (isPlaying || !currentChart) return;
-            initializeAudio();
-            if (audioContext && audioContext.state === 'suspended') {
-                await audioContext.resume();
+            resizeCanvas(); seekChartState(time); 
+            const elapsedTime = time, baseCenterY = canvas.clientHeight / 2;
+            const canvasWidth = canvas.clientWidth, canvasHeight = canvas.clientHeight; const canvasMargin = 100; 
+            ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+            
+            drawWaveform(elapsedTime);
+
+            const LOOK_BEHIND = 5.0;
+            const tMin = elapsedTime - LOOK_BEHIND;
+
+            const barlines = currentChart.barlineArr;
+            const bLo = lowerBound(barlines, tMin);
+            for (let i = barlines.length - 1; i >= bLo; i--) {
+                const note = barlines[i]; if (!note.barlineVisible) continue;
+                
+                let currentBpmScroll = note.bpm * note.scroll;
+                let currentBpmScrollY = note.bpm * note.scrollY;
+                if (isFixedBpmEnabled || isWaveformEnabled) {
+                    currentBpmScroll = fixedBpmValue;
+                    currentBpmScrollY = (note.bpm !== 0) ? note.scrollY * (fixedBpmValue / note.bpm) : 0;
+                }
+                const ppsX = BASE_SCROLL_FACTOR * currentBpmScroll * scrollMultiplier;
+                const ppsY = BASE_SCROLL_FACTOR * currentBpmScrollY * scrollMultiplier;
+                
+                if (ppsX === 0 && ppsY === 0) continue;
+                const timeDiff = note.time - elapsedTime;
+                const x = HIT_POSITION_X + timeDiff * ppsX, y = baseCenterY + timeDiff * ppsY;
+                if (x < -canvasMargin || x > canvasWidth + canvasMargin || y < -canvasMargin || y > canvasHeight + canvasMargin) continue;
+                const angle = Math.atan2(ppsY, ppsX), normalAngle = angle + Math.PI / 2;
+                const dx = Math.cos(normalAngle) * (canvasHeight / 2), dy = Math.sin(normalAngle) * (canvasHeight / 2);
+                ctx.beginPath(); ctx.moveTo(x - dx, y - dy); ctx.lineTo(x + dx, y + dy);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)'; ctx.lineWidth = 2; ctx.stroke();
             }
 
-            isPlaying = true;
-            
-            const requiredWaveName = allCourses.globalConfig.WAVE;
-            const isFileNameMatch = (requiredWaveName && uploadedMusicFileName && requiredWaveName === uploadedMusicFileName);
-            
-            simulationStartOffset = currentElapsedTime;
-            simulationStartTime = audioContext.currentTime;
+            const regular = currentChart.regularArr;
+            const rLo = lowerBound(regular, tMin - 30.0);
 
-            // 高精度なWeb Audio API による楽曲の再生スケジュール
-            if (musicAudioBuffer && isFileNameMatch) {
-                musicSourceNode = audioContext.createBufferSource();
-                musicSourceNode.buffer = musicAudioBuffer;
-                musicSourceNode.playbackRate.value = playbackSpeed;
-                musicSourceNode.connect(musicGainNode);
-
-                // 音楽が始まるべき譜面上の基準時間 (TJA OFFSET の対応)
-                const offset = allCourses.globalConfig.OFFSET || 0;
-                const targetTime = coolDownTime + Math.max(0, offset);
-
-                if (simulationStartOffset < targetTime) {
-                    // まだ音楽開始時間に到達していない場合、未来の時刻で再生予約
-                    let waitTime = targetTime - simulationStartOffset;
-                    musicSourceNode.start(audioContext.currentTime + waitTime, 0);
-                } else {
-                    // すでに音楽の途中からシークして再生する場合、ピッタリの位置から即座に再生
-                    let playedRealTime = simulationStartOffset - targetTime;
-                    let musicOffset = playedRealTime * playbackSpeed;
-                    musicSourceNode.start(audioContext.currentTime, musicOffset);
+            if (showGridLines) {
+                for (let i = regular.length - 1; i >= rLo; i--) {
+                    const note = regular[i];
+                    
+                    let currentBpmScroll = note.bpm * note.scroll;
+                    if (isFixedBpmEnabled || isWaveformEnabled) currentBpmScroll = fixedBpmValue;
+                    const ppsX = BASE_SCROLL_FACTOR * currentBpmScroll * scrollMultiplier;
+                    
+                    const timeDiff = note.time - elapsedTime;
+                    const x = HIT_POSITION_X + timeDiff * ppsX;
+                    if (x < -canvasMargin || x > canvasWidth + canvasMargin) continue;
+                    ctx.beginPath(); ctx.moveTo(x, baseCenterY - 40); ctx.lineTo(x, baseCenterY + 40);
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)'; ctx.lineWidth = 1; ctx.stroke();
                 }
             }
 
-            playButton.textContent = '停止';
-            playButton.classList.replace('bg-blue-500', 'bg-red-500');
-            playButton.classList.replace('hover:bg-blue-600', 'hover:bg-red-600');
-            editor.disabled = true;
-            rollCountDisplay.style.opacity = 0;
-            lastAutoEffectTime = 0;
-            lastFrameTime = performance.now();
+            for (let i = regular.length - 1; i >= rLo; i--) {
+                const note = regular[i]; if (note.type === '0') continue;
+                
+                let currentBpmScroll = note.bpm * note.scroll;
+                let currentBpmScrollY = note.bpm * note.scrollY;
+                if (isFixedBpmEnabled || isWaveformEnabled) {
+                    currentBpmScroll = fixedBpmValue;
+                    currentBpmScrollY = (note.bpm !== 0) ? note.scrollY * (fixedBpmValue / note.bpm) : 0;
+                }
+                const ppsX = BASE_SCROLL_FACTOR * currentBpmScroll * scrollMultiplier;
+                const ppsY = BASE_SCROLL_FACTOR * currentBpmScrollY * scrollMultiplier;
+                
+                const timeDiff = note.time - elapsedTime; 
+                const x = HIT_POSITION_X + timeDiff * ppsX, y = baseCenterY + timeDiff * ppsY; 
+                if (note.type < '5' || (note.type === '7' && (note.judgeResult === 'hit' || note.judgeResult === 'miss'))) { if (x < -canvasMargin || x > canvasWidth + canvasMargin || y < -canvasMargin || y > canvasHeight + canvasMargin) continue; } 
+                if (note.type === '5' || note.type === '6' || (note.type === '7' && note.judgeResult === 'pending')) { const endTimeDiff = note.endTime - elapsedTime; const endX = HIT_POSITION_X + endTimeDiff * ppsX, endY = baseCenterY + endTimeDiff * ppsY; if ((x < -canvasMargin && endX < -canvasMargin) || (x > canvasWidth + canvasMargin && endX > canvasWidth + canvasMargin) || (y < -canvasMargin && endY < -canvasMargin) || (y > canvasHeight + canvasMargin && endY > canvasHeight + canvasMargin)) continue; } 
+                const size = NOTE_SIZE[note.type] || NOTE_SIZE['1'], color = NOTE_COLORS[note.type] || '#FFFFFF'; 
+                if (note.judgeResult === 'hit' && (note.type >= '1' && note.type <= '4')) { continue; } 
+                else if (note.type === '7') { 
+                    if (note.judgeResult === 'hit' || note.judgeResult === 'miss') continue; 
+                    const endTimeDiff = note.endTime - elapsedTime; const endX = HIT_POSITION_X + endTimeDiff * ppsX, endY = baseCenterY + endTimeDiff * ppsY; 
+                    let displayX = x, displayY = y, stayAtHitPos = false; 
+                    if (note.judgeResult === 'pending') { if (elapsedTime <= note.endTime) { if (ppsX > 0) { if (x <= HIT_POSITION_X && endX > HIT_POSITION_X) stayAtHitPos = true; } else if (ppsX < 0) { if (x >= HIT_POSITION_X && endX < HIT_POSITION_X) stayAtHitPos = true; } else if (ppsY !== 0) { if (ppsY > 0) { if (y >= baseCenterY && endY > baseCenterY) stayAtHitPos = true; } else { if (y <= baseCenterY && endY < baseCenterY) stayAtHitPos = true; } } if (stayAtHitPos) { displayX = HIT_POSITION_X; if (ppsX !== 0) { const timeToHitX = (HIT_POSITION_X - x) / ppsX, displayTime = note.time + timeToHitX; const displayTimeDiff = displayTime - elapsedTime; displayY = baseCenterY + displayTimeDiff * ppsY; } else { displayY = baseCenterY; } } } else { displayX = endX; displayY = endY; } } 
+                    if (displayX > canvasWidth + canvasMargin || displayX < -canvasMargin || displayY > canvasHeight + canvasMargin || displayY < -canvasMargin) continue; 
+                    ctx.beginPath(); ctx.arc(displayX, displayY, size, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill(); drawNoteStroke(note.type, displayX, displayY); ctx.fillStyle = 'white'; ctx.font = 'bold 18px Inter'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; if (note.hits > 0) ctx.fillText(note.hits.toString(), displayX, displayY); 
+                } else if (note.type === '5' || note.type === '6') { 
+                    const endTimeDiff = note.endTime - elapsedTime; const endX = HIT_POSITION_X + endTimeDiff * ppsX, endY = baseCenterY + endTimeDiff * ppsY; 
+                    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(endX, endY); ctx.strokeStyle = color; ctx.lineWidth = size * 2; ctx.stroke(); ctx.beginPath(); ctx.arc(endX, endY, size, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill(); ctx.beginPath(); ctx.arc(x, y, size, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill(); drawNoteStroke(note.type, x, y); 
+                } else { ctx.beginPath(); ctx.arc(x, y, size, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill(); drawNoteStroke(note.type, x, y); } 
+            } 
+        }
+
+        function setChartTime(time) { if (!currentChart) { currentElapsedTime = 0; currentMeasureIndex = 0; currentCombo = 0; updateComboDisplay(); updateMeasureDisplay(); seekChartState(0); updatePreview(0); return; } const wasPlaying = isPlaying; if (wasPlaying) stopSimulation(); currentElapsedTime = time; currentMeasureIndex = findMeasureIndex(time); let initialCombo = 0; currentChart.notes.forEach(note => { if (note.type === '0') return; if (note.time < time) { if ((note.type >= '5' && note.type <= '7') && note.endTime > time) { note.judgeResult = 'pending'; note.currentHits = 0; note.lastAutoHitTime = 0; } else { note.judgeResult = 'hit'; if (note.type === '1' || note.type === '2' || note.type === '3' || note.type === '4') initialCombo++; if (note.type === '7' && note.hits > 0) note.currentHits = note.hits; if (note.type === '5' || note.type === '6') { const duration = note.endTime - note.time; note.currentHits = Math.floor(duration / (1.0 / autoRollSpeed)); } } } else { note.judgeResult = 'pending'; note.currentHits = 0; note.lastAutoHitTime = 0; } }); currentCombo = initialCombo; if (currentChart.regularArr) { currentChart._autoCheckStart = Math.max(0, lowerBound(currentChart.regularArr, time - JUDGE_BAD * 2) - 1); } updateComboDisplay(); updateMeasureDisplay(); seekChartState(currentElapsedTime); updatePreview(currentElapsedTime); if (wasPlaying) { const targetTime = currentElapsedTime; if (targetTime === 0) { chartCoolDownUntil = coolDownTime; currentElapsedTime = 0; } else { currentElapsedTime = Math.max(0, targetTime - coolDownTime); chartCoolDownUntil = targetTime; } seekChartState(currentElapsedTime); stopAtTime = null; startSimulation(); } }
+        
+        async function startSimulation() {
+            if (isPlaying || !currentChart) return;
+            initializeAudio(); if (audioContext && audioContext.state === 'suspended') { await audioContext.resume(); } isPlaying = true;
+            const requiredWaveName = allCourses.globalConfig.WAVE; const isFileNameMatch = (requiredWaveName && uploadedMusicFileName && requiredWaveName === uploadedMusicFileName);
+            simulationStartOffset = currentElapsedTime; simulationStartTime = audioContext.currentTime;
+
+            // ----- SE事前合成（超軽量オート再生用） -----
+            let autoSeAudioBuffer = null;
+            if (isAutoPlay && audioContext) {
+                const sampleRate = audioContext.sampleRate;
+                let maxTime = currentChart.endTime || 0;
+                if (maxTime === 0 && currentChart.notes.length > 0) {
+                    maxTime = currentChart.notes[currentChart.notes.length - 1].time;
+                }
+                let overallMaxTime = maxTime + 2.0; 
+                
+                const totalSamples = Math.ceil(overallMaxTime * sampleRate);
+                if (totalSamples > 0) {
+                    const outputL = new Float32Array(totalSamples);
+                    const outputR = new Float32Array(totalSamples);
+                    
+                    const soundChannels = {
+                        don: audioBuffers.don ? { L: audioBuffers.don.getChannelData(0), R: audioBuffers.don.numberOfChannels > 1 ? audioBuffers.don.getChannelData(1) : audioBuffers.don.getChannelData(0) } : null,
+                        ka: audioBuffers.ka ? { L: audioBuffers.ka.getChannelData(0), R: audioBuffers.ka.numberOfChannels > 1 ? audioBuffers.ka.getChannelData(1) : audioBuffers.ka.getChannelData(0) } : null,
+                        balloon: audioBuffers.balloon ? { L: audioBuffers.balloon.getChannelData(0), R: audioBuffers.balloon.numberOfChannels > 1 ? audioBuffers.balloon.getChannelData(1) : audioBuffers.balloon.getChannelData(0) } : null
+                    };
+
+                    const effectiveStartTime = chartCoolDownUntil !== null ? chartCoolDownUntil : simulationStartOffset;
+                    
+                    let seEvents = [];
+                    for (let i = 0; i < currentChart.notes.length; i++) {
+                        const note = currentChart.notes[i];
+                        if (note.type === '1' || note.type === '3') {
+                            if (note.time >= effectiveStartTime) seEvents.push({ time: note.time, type: 'don' });
+                        }
+                        else if (note.type === '2' || note.type === '4') {
+                            if (note.time >= effectiveStartTime) seEvents.push({ time: note.time, type: 'ka' });
+                        }
+                        else if (note.type === '5' || note.type === '6') {
+                            const hitInterval = 1.0 / autoRollSpeed;
+                            for (let t = note.time; t <= note.endTime; t += hitInterval) {
+                                if (t >= effectiveStartTime) seEvents.push({ time: t, type: 'don' });
+                            }
+                        }
+                        else if (note.type === '7') {
+                            const hitInterval = 1.0 / autoRollSpeed;
+                            let hits = 0;
+                            for (let t = note.time; t <= note.endTime; t += hitInterval) {
+                                if (t >= effectiveStartTime) seEvents.push({ time: t, type: 'don' });
+                                hits++;
+                                if (hits >= note.hits) {
+                                    if (t >= effectiveStartTime) seEvents.push({ time: t, type: 'balloon' });
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    seEvents.sort((a, b) => a.time - b.time);
+
+                    const nextSameBufferIdx = new Int32Array(seEvents.length);
+                    const lastSeen = new Map();
+                    for (let i = seEvents.length - 1; i >= 0; i--) {
+                        const typeStr = seEvents[i].type;
+                        if (lastSeen.has(typeStr)) nextSameBufferIdx[i] = lastSeen.get(typeStr);
+                        else nextSameBufferIdx[i] = totalSamples * 2;
+                        lastSeen.set(typeStr, ((seEvents[i].time) * sampleRate + 0.5) | 0);
+                    }
+
+                    for (let i = 0; i < seEvents.length; i++) {
+                        const ev = seEvents[i];
+                        let bufKey = ev.type;
+                        if (!soundChannels[bufKey] && bufKey === 'balloon') bufKey = 'don';
+                        if (!soundChannels[bufKey]) continue;
+
+                        const cL = soundChannels[bufKey].L;
+                        const cR = soundChannels[bufKey].R;
+                        const startIdx = (ev.time * sampleRate + 0.5) | 0;
+                        if (startIdx < 0 || startIdx >= totalSamples) continue;
+
+                        const len = cL.length;
+                        const maxIdx = nextSameBufferIdx[i];
+                        for (let j = 0, idx = startIdx; j < len && idx < maxIdx && idx < totalSamples; j++, idx++) {
+                            outputL[idx] += cL[j];
+                            outputR[idx] += cR[j];
+                        }
+                    }
+
+                    autoSeAudioBuffer = audioContext.createBuffer(2, totalSamples, sampleRate);
+                    autoSeAudioBuffer.getChannelData(0).set(outputL);
+                    autoSeAudioBuffer.getChannelData(1).set(outputR);
+
+                    autoSeSourceNode = audioContext.createBufferSource();
+                    autoSeSourceNode.buffer = autoSeAudioBuffer;
+                    autoSeSourceNode.playbackRate.value = 1.0; 
+                    autoSeSourceNode.connect(seGainNode);
+                }
+            }
+            // ------------------------------------
+
+            if (musicAudioBuffer && isFileNameMatch) {
+                musicSourceNode = audioContext.createBufferSource(); musicSourceNode.buffer = musicAudioBuffer; musicSourceNode.playbackRate.value = playbackSpeed; musicSourceNode.connect(musicGainNode);
+            }
             
-            logicIntervalId = setInterval(updateLogic, 1000 / 240);
-            animationFrameId = requestAnimationFrame(drawLoop);
+            const offset = allCourses.globalConfig.OFFSET || 0; 
+            const targetTime = coolDownTime + Math.max(0, offset);
+
+            if (simulationStartOffset < targetTime) { 
+                let waitTime = (targetTime - simulationStartOffset) / playbackSpeed; 
+                if (musicSourceNode) musicSourceNode.start(audioContext.currentTime + waitTime, 0); 
+            } else { 
+                let playedRealTime = simulationStartOffset - targetTime; 
+                let audioOffset = playedRealTime * playbackSpeed; 
+                if (musicSourceNode) musicSourceNode.start(audioContext.currentTime, audioOffset); 
+            }
+            
+            if (autoSeSourceNode && autoSeAudioBuffer) {
+                let seOffset = simulationStartOffset;
+                if (seOffset >= 0 && seOffset < autoSeAudioBuffer.duration) {
+                    autoSeSourceNode.start(audioContext.currentTime, seOffset);
+                } else if (seOffset < 0) {
+                    autoSeSourceNode.start(audioContext.currentTime + (-seOffset), 0);
+                }
+            }
+
+            playButton.textContent = '停止'; playButton.classList.replace('bg-blue-500', 'bg-red-500'); playButton.classList.replace('hover:bg-blue-600', 'hover:bg-red-600');
+            editor.disabled = true; rollCountDisplay.style.opacity = 0; lastAutoEffectTime = 0; lastFrameTime = performance.now();
+            logicIntervalId = setInterval(updateLogic, 1000 / renderFPS); animationFrameId = requestAnimationFrame(drawLoop);
         }
         
         function stopSimulation() { 
-            if (!isPlaying) return; 
-            isPlaying = false; 
-            
-            // AudioBufferSourceNode は使い捨てなので再生を止めて破棄
-            if (musicSourceNode) {
-                try { musicSourceNode.stop(); } catch(e) {}
-                musicSourceNode.disconnect();
-                musicSourceNode = null;
-            }
-            
-            stopAtTime = null; 
-            chartCoolDownUntil = null; 
-            if (animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; } 
-            if (logicIntervalId) { clearInterval(logicIntervalId); logicIntervalId = null; } 
-            playButton.textContent = '再生'; 
-            playButton.classList.replace('bg-red-500', 'bg-blue-500'); 
-            playButton.classList.replace('hover:bg-red-600', 'hover:bg-blue-600'); 
-            editor.disabled = false; 
-            judgeDisplay.innerHTML = ''; 
-            rollCountDisplay.style.opacity = 0; 
-            updatePreview(currentElapsedTime); 
+            if (!isPlaying) return; isPlaying = false; 
+            if (musicSourceNode) { try { musicSourceNode.stop(); } catch(e) {} musicSourceNode.disconnect(); musicSourceNode = null; }
+            if (autoSeSourceNode) { try { autoSeSourceNode.stop(); } catch(e) {} autoSeSourceNode.disconnect(); autoSeSourceNode = null; }
+            stopAtTime = null; chartCoolDownUntil = null; if (animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; } if (logicIntervalId) { clearInterval(logicIntervalId); logicIntervalId = null; } 
+            playButton.textContent = '再生'; playButton.classList.replace('bg-red-500', 'bg-blue-500'); playButton.classList.replace('hover:bg-red-600', 'hover:bg-blue-600'); 
+            editor.disabled = false; judgeDisplay.innerHTML = ''; rollCountDisplay.style.opacity = 0; updatePreview(currentElapsedTime); 
         }
         
-        function findMeasureIndex(time) { if (!currentChart) return 0; let index = 0; for (let i = 0; i < currentChart.allMeasureTimes.length; i++) { if (currentChart.allMeasureTimes[i] <= time) index = i; else break; } return index; }
+        function findMeasureIndex(time) { if (!currentChart) return 0; const times = currentChart.allMeasureTimes; if (times.length === 0) return 0; let lo = 0, hi = times.length - 1, result = 0; while (lo <= hi) { const mid = (lo + hi) >>> 1; if (times[mid] <= time) { result = mid; lo = mid + 1; } else hi = mid - 1; } return result; }
         function seekToMeasure(direction) { if (isPlaying || !currentChart) return; const newMeasureIndex = Math.max(0, Math.min(currentChart.allMeasureTimes.length - 1, currentMeasureIndex + direction)); setChartTime(currentChart.allMeasureTimes[newMeasureIndex]); }
         function playMeasure() { if (isPlaying) { stopSimulation(); if (currentChart) { const newMeasureIndex = findMeasureIndex(currentElapsedTime); setChartTime(currentChart.allMeasureTimes[newMeasureIndex]); } } else { const newMeasureIndex = findMeasureIndex(currentElapsedTime); const targetTime = currentChart.allMeasureTimes[newMeasureIndex]; setChartTime(targetTime); currentElapsedTime = Math.max(0, targetTime - coolDownTime); chartCoolDownUntil = targetTime; seekChartState(currentElapsedTime); stopAtTime = null; startSimulation(); } }
         function togglePlay() { tjaEditor.blur(); previewContainer.focus(); if (isPlaying) { stopSimulation(); if (currentChart) { const newMeasureIndex = findMeasureIndex(currentElapsedTime); setChartTime(currentChart.allMeasureTimes[newMeasureIndex]); } } else { const targetTime = currentElapsedTime; setChartTime(targetTime); if (targetTime === 0) { chartCoolDownUntil = coolDownTime; currentElapsedTime = 0; } else { currentElapsedTime = Math.max(0, targetTime - coolDownTime); chartCoolDownUntil = targetTime; } seekChartState(currentElapsedTime); stopAtTime = null; startSimulation(); } }
         function updateAutoDisplay() { autoStatus.style.display = isAutoPlay ? 'block' : 'none'; }
         function toggleAutoPlay() { isAutoPlay = !isAutoPlay; updateAutoDisplay(); }
-        const keyState = { ArrowLeft: { pressed: false, timer: null, pressStartTime: 0, currentInterval: 100 }, ArrowRight: { pressed: false, timer: null, pressStartTime: 0, currentInterval: 100 } }; const KEY_REPEAT_DELAY = 250, KEY_REPEAT_INTERVAL_BASE = 100, KEY_SPEED_UP_TIME = 2000;
-        function handleKeyDown(e) { const keyUpper = e.key.toUpperCase(); const allPlayerKeys = [...playerKeys.donL, ...playerKeys.donR, ...playerKeys.kaL, ...playerKeys.kaR]; if (allPlayerKeys.includes(keyUpper)) { if (e.repeat) return; handlePlayerInput(keyUpper); return; } if (!isPlaying && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { e.preventDefault(); if (!currentChart || currentChart.barlineTimes.length === 0) return; if (e.key === 'ArrowUp') setChartTime(currentChart.barlineTimes[currentChart.barlineTimes.length - 1]); else if (e.key === 'ArrowDown') setChartTime(currentChart.barlineTimes[0]); return; } if (keyState[e.key]) { e.preventDefault(); if (keyState[e.key].pressed) return; keyState[e.key].pressed = true; keyState[e.key].pressStartTime = performance.now(); keyState[e.key].currentInterval = KEY_REPEAT_INTERVAL_BASE; seekToMeasure(e.key === 'ArrowLeft' ? -1 : 1); keyState[e.key].timer = setTimeout(() => { if (keyState[e.key].timer) clearInterval(keyState[e.key].timer); keyState[e.key].timer = setInterval(() => { const elapsedTime = performance.now() - keyState[e.key].pressStartTime; const speedUpCount = Math.floor(elapsedTime / KEY_SPEED_UP_TIME); const newInterval = KEY_REPEAT_INTERVAL_BASE / Math.pow(2, speedUpCount); if (newInterval !== keyState[e.key].currentInterval) { clearInterval(keyState[e.key].timer); keyState[e.key].currentInterval = newInterval; keyState[e.key].timer = setInterval(() => seekToMeasure(e.key === 'ArrowLeft' ? -1 : 1), keyState[e.key].currentInterval); } seekToMeasure(e.key === 'ArrowLeft' ? -1 : 1); }, keyState[e.key].currentInterval); }, KEY_REPEAT_DELAY); } else if (e.key === ' ') { e.preventDefault(); if (e.repeat) return; playMeasure(); } }
-        function handleKeyUp(e) { if (keyState[e.key]) { e.preventDefault(); keyState[e.key].pressed = false; if (keyState[e.key].timer) { clearInterval(keyState[e.key].timer); keyState[e.key].timer = null; } } }
+        
+        let arrowKeyTimers = { ArrowLeft: null, ArrowRight: null };
+        function startArrowKeyScroll(key, baseDirection) {
+            if (arrowKeyTimers[key]) return;
+            seekToMeasure(baseDirection);
+            const startTime = performance.now();
+            const state = { timer: null };
+            arrowKeyTimers[key] = state;
+            
+            function loop() {
+                const elapsed = performance.now() - startTime;
+                const speedMultiplier = Math.pow(2, Math.floor(elapsed / 2000)); 
+                
+                let interval = 100 / speedMultiplier;
+                let step = baseDirection;
+                
+                if (interval < 20) {
+                    step = baseDirection * Math.ceil(20 / interval);
+                    interval = 20;
+                }
+                
+                state.timer = setTimeout(() => { seekToMeasure(step); loop(); }, interval);
+            }
+            state.timer = setTimeout(() => { seekToMeasure(baseDirection); loop(); }, 400); 
+        }
+
+        function handleKeyDown(e) { 
+            const keyUpper = e.key.toUpperCase(); const allPlayerKeys = [...playerKeys.donL, ...playerKeys.donR, ...playerKeys.kaL, ...playerKeys.kaR]; 
+            if (allPlayerKeys.includes(keyUpper)) { if (e.repeat) return; handlePlayerInput(keyUpper); return; } 
+            
+            if (!isPlaying && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { e.preventDefault(); if (!currentChart || currentChart.barlineTimes.length === 0) return; if (e.key === 'ArrowUp') setChartTime(currentChart.barlineTimes[currentChart.barlineTimes.length - 1]); else if (e.key === 'ArrowDown') setChartTime(currentChart.barlineTimes[0]); return; } 
+            
+            if (!isPlaying && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+                e.preventDefault();
+                if (e.repeat) return; 
+                startArrowKeyScroll(e.key, e.key === 'ArrowLeft' ? -1 : 1);
+                return;
+            }
+            
+            if (e.key === ' ') { e.preventDefault(); if (e.repeat) return; playMeasure(); } 
+        }
+        function handleKeyUp(e) { 
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                if (arrowKeyTimers[e.key]) { clearTimeout(arrowKeyTimers[e.key].timer); arrowKeyTimers[e.key] = null; }
+            }
+        }
         previewContainer.addEventListener('keydown', handleKeyDown); previewContainer.addEventListener('keyup', handleKeyUp);
+        
         function handlePlayerInput(key) { 
             if (!isPlaying || isAutoPlay || !currentChart || chartCoolDownUntil !== null) return; 
-            initializeAudio(); 
-            let inputType = null, hitEffectType = null; 
-            if (playerKeys.donL.includes(key)) { inputType = 'don'; hitEffectType = 'don-left'; } 
-            else if (playerKeys.donR.includes(key)) { inputType = 'don'; hitEffectType = 'don-right'; } 
-            else if (playerKeys.kaL.includes(key)) { inputType = 'ka'; hitEffectType = 'ka-left'; } 
-            else if (playerKeys.kaR.includes(key)) { inputType = 'ka'; hitEffectType = 'ka-right'; } 
+            initializeAudio(); let inputType = null, hitEffectType = null; 
+            if (playerKeys.donL.includes(key)) { inputType = 'don'; hitEffectType = 'don-left'; } else if (playerKeys.donR.includes(key)) { inputType = 'don'; hitEffectType = 'don-right'; } else if (playerKeys.kaL.includes(key)) { inputType = 'ka'; hitEffectType = 'ka-left'; } else if (playerKeys.kaR.includes(key)) { inputType = 'ka'; hitEffectType = 'ka-right'; } 
             if (!inputType) return; 
             showHitEffect(hitEffectType); playSE(inputType); 
-            const elapsedTime = currentElapsedTime, baseCenterY = canvas.clientHeight / 2; 
-            let hitRoll = false; 
+            const elapsedTime = currentElapsedTime, baseCenterY = canvas.clientHeight / 2; let hitRoll = false; 
             for (const note of currentChart.notes) { 
-                if (note.type < '5' || note.judgeResult !== 'pending' || !(elapsedTime >= note.time && elapsedTime <= note.endTime)) continue; 
+                if (note.type === '0' || note.type < '5' || note.judgeResult !== 'pending' || !(elapsedTime >= note.time && elapsedTime <= note.endTime)) continue; 
                 if (note.type === '7') { 
-                    const { bpm, scroll, scrollY } = note; 
-                    const pixelsPerSecondX = BASE_SCROLL_FACTOR * bpm * scroll * scrollMultiplier, pixelsPerSecondY = BASE_SCROLL_FACTOR * bpm * scrollY * scrollMultiplier; 
-                    const x = HIT_POSITION_X + (note.time - elapsedTime) * pixelsPerSecondX, endX = HIT_POSITION_X + (note.endTime - elapsedTime) * pixelsPerSecondX; 
+                    const { ppsX, ppsY } = getEffectivePPS(note.bpm, note.scroll, note.scrollY);
+                    const x = HIT_POSITION_X + (note.time - elapsedTime) * ppsX, endX = HIT_POSITION_X + (note.endTime - elapsedTime) * ppsX; 
                     let stayAtHitPos = false; 
-                    if (pixelsPerSecondX > 0) { 
-                        if (x <= HIT_POSITION_X && endX > HIT_POSITION_X) stayAtHitPos = true; 
-                    } else if (pixelsPerSecondX < 0) { 
-                        if (x >= HIT_POSITION_X && endX < HIT_POSITION_X) stayAtHitPos = true; 
-                    } else if (pixelsPerSecondY !== 0) { 
-                        if (pixelsPerSecondY > 0) { 
-                            if (baseCenterY + (note.time - elapsedTime) * pixelsPerSecondY >= baseCenterY && baseCenterY + (note.endTime - elapsedTime) * pixelsPerSecondY > baseCenterY) stayAtHitPos = true; 
-                        } else { 
-                            if (baseCenterY + (note.time - elapsedTime) * pixelsPerSecondY <= baseCenterY && baseCenterY + (note.endTime - elapsedTime) * pixelsPerSecondY < baseCenterY) stayAtHitPos = true; 
-                        } 
-                    } 
+                    if (ppsX > 0) { if (x <= HIT_POSITION_X && endX > HIT_POSITION_X) stayAtHitPos = true; } else if (ppsX < 0) { if (x >= HIT_POSITION_X && endX < HIT_POSITION_X) stayAtHitPos = true; } else if (ppsY !== 0) { if (ppsY > 0) { if (baseCenterY + (note.time - elapsedTime) * ppsY >= baseCenterY && baseCenterY + (note.endTime - elapsedTime) * ppsY > baseCenterY) stayAtHitPos = true; } else { if (baseCenterY + (note.time - elapsedTime) * ppsY <= baseCenterY && baseCenterY + (note.endTime - elapsedTime) * ppsY < baseCenterY) stayAtHitPos = true; } } 
                     if (!stayAtHitPos) continue; 
                 } 
-                if (note.type === '5' || note.type === '6') { hitRoll = true; note.currentHits++; } 
-                else if (note.type === '7') { 
-                    if (inputType === 'don') { 
-                        hitRoll = true; note.currentHits++; 
-                        if (note.hits > 0 && note.currentHits >= note.hits) { note.judgeResult = 'hit'; playSE('balloon'); } 
-                    } 
-                } 
+                if (note.type === '5' || note.type === '6') { hitRoll = true; note.currentHits++; } else if (note.type === '7') { if (inputType === 'don') { hitRoll = true; note.currentHits++; if (note.hits > 0 && note.currentHits >= note.hits) { note.judgeResult = 'hit'; playSE('balloon'); } } } 
                 if (hitRoll) break; 
             } 
             if (hitRoll) return; 
             let targetNote = null, minDiff = Infinity; 
             for (const note of currentChart.notes) { 
-                if (note.judgeResult !== 'pending' || (note.type >= '5' && note.type <= '7') || note.type === 'BARLINE') continue; 
-                const diff = note.time - elapsedTime, absDiff = Math.abs(diff); 
-                if (absDiff > JUDGE_BAD) continue; 
-                const { bpm, scrollY } = note, pixelsPerSecondY = BASE_SCROLL_FACTOR * bpm * scrollY * scrollMultiplier; 
-                const y = baseCenterY + diff * pixelsPerSecondY; 
-                if (Math.abs(y - baseCenterY) > 30) continue; 
-                const noteType = (note.type === '1' || note.type === '3') ? 'don' : 'ka'; 
-                if (noteType !== inputType) continue; 
+                if (note.type === '0' || note.judgeResult !== 'pending' || (note.type >= '5' && note.type <= '7') || note.type === 'BARLINE') continue; 
+                const diff = note.time - elapsedTime, absDiff = Math.abs(diff); if (absDiff > JUDGE_BAD) continue; 
+                const { ppsY } = getEffectivePPS(note.bpm, note.scroll, note.scrollY);
+                const y = baseCenterY + diff * ppsY; if (Math.abs(y - baseCenterY) > 30) continue; 
+                const noteType = (note.type === '1' || note.type === '3') ? 'don' : 'ka'; if (noteType !== inputType) continue; 
                 if (absDiff < minDiff) { minDiff = absDiff; targetNote = note; } 
             } 
             if (targetNote) { 
-                targetNote.judgeResult = 'hit'; 
-                if (minDiff <= JUDGE_PERFECT) { showJudge('良', '#FFD700'); currentCombo++; } 
-                else if (minDiff <= JUDGE_GOOD) { showJudge('可', '#C0C0C0'); currentCombo++; } 
-                else { showJudge('不可', '#FF6347'); currentCombo = 0; } 
+                targetNote.judgeResult = 'hit'; if (minDiff <= JUDGE_PERFECT) { showJudge('良', '#FFD700'); currentCombo++; } else if (minDiff <= JUDGE_GOOD) { showJudge('可', '#C0C0C0'); currentCombo++; } else { showJudge('不可', '#FF6347'); currentCombo = 0; } 
                 updateComboDisplay(); 
             } 
         }
-        window.addEventListener('keydown', (e) => { if (e.key === 'Alt') { e.preventDefault(); editor.blur(); previewContainer.focus(); } if (e.altKey && e.key.toLowerCase() === 'a') { e.preventDefault(); toggleAutoPlay(); document.getElementById('autoPlaySetting').checked = isAutoPlay; } });
-        previewContainer.addEventListener('click', () => previewContainer.focus());
+        
         function setupDropdown(buttonId, menuId) { const button = document.getElementById(buttonId); const menu = document.getElementById(menuId); button.addEventListener('click', (e) => { e.stopPropagation(); menu.style.display = menu.style.display === 'block' ? 'none' : 'block'; }); menu.addEventListener('click', (e) => { e.stopPropagation(); }); }
         setupDropdown('importDropdownButton', 'importDropdownMenu'); setupDropdown('exportDropdownButton', 'exportDropdownMenu');
         window.addEventListener('click', () => { document.getElementById('importDropdownMenu').style.display = 'none'; document.getElementById('exportDropdownMenu').style.display = 'none'; });
+        
         document.getElementById('uploadTjaButton').addEventListener('click', (e) => { e.preventDefault(); document.getElementById('tjaFileInput').click(); });
         document.getElementById('uploadMusicButton').addEventListener('click', (e) => { e.preventDefault(); document.getElementById('musicFileInput').click(); });
         document.getElementById('tjaFileInput').addEventListener('change', (event) => {
-            const file = event.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
+            const file = event.target.files[0]; if (!file) return; const reader = new FileReader();
             reader.onload = (e) => {
-                const buffer = e.target.result;
-                const codes = new Uint8Array(buffer);
-                const detectedEncoding = Encoding.detect(codes);
+                const buffer = e.target.result; const codes = new Uint8Array(buffer); const detectedEncoding = Encoding.detect(codes);
                 const text = new TextDecoder(detectedEncoding === 'UTF8' ? 'utf-8' : 'shift-jis').decode(buffer);
-
-                editor.value = text;
-                allCourses = parseTJA(editor.value);
-                updateCourseSelect();
-                const selectedKey = parseInt(courseSelect.value, 10);
-                currentChart = allCourses.courses[selectedKey] || null;
-                setChartTime(0);
-                localStorage.setItem('tjaContent', editor.value);
+                editor.value = text; allCourses = parseTJA(editor.value); updateCourseSelect();
+                const selectedKey = parseInt(courseSelect.value, 10); currentChart = allCourses.courses[selectedKey] || null;
+                setChartTime(0); localStorage.setItem('tjaContent', editor.value); updateEditorGutter(); updateCursorPosition();
             };
-            reader.readAsArrayBuffer(file);
-            event.target.value = null;
+            reader.readAsArrayBuffer(file); event.target.value = null;
         });
+        
         function updateCourseSelect() { const keys = Object.keys(allCourses.courses).map(k => parseInt(k, 10)).sort((a, b) => b - a); courseSelect.innerHTML = ''; if (keys.length === 0) { courseSelect.innerHTML = '<option value="3">おに</option>'; courseSelect.value = 3; return; } const keyMap = { 0: 'かんたん', 1: 'ふつう', 2: 'むずかしい', 3: 'おに', 4: 'おに(裏)' }; keys.forEach(key => { const option = document.createElement('option'); option.value = key; option.textContent = keyMap[key] || `Edit ${key}`; courseSelect.appendChild(option); }); if (keys.includes(3)) courseSelect.value = 3; else courseSelect.value = keys[0]; }
-        courseSelect.addEventListener('change', () => { const selectedKey = parseInt(courseSelect.value, 10); currentChart = allCourses.courses[selectedKey] || null; setChartTime(0); });
+        courseSelect.addEventListener('change', () => { const selectedKey = parseInt(courseSelect.value, 10); currentChart = allCourses.courses[selectedKey] || null; setChartTime(0); updateEditorGutter(); updateCursorPosition(); });
         
         async function handleMusicUpload(file) {
             if (uploadedMusicObjectURL) URL.revokeObjectURL(uploadedMusicObjectURL);
-            uploadedMusicObjectURL = URL.createObjectURL(file);
-            uploadedMusicFileName = file.name;
-            musicFileName.textContent = `楽曲: ${file.name}`;
-
+            uploadedMusicObjectURL = URL.createObjectURL(file); uploadedMusicFileName = file.name; musicFileName.textContent = `楽曲: ${file.name}`;
             initializeAudio();
-
-            try {
-                const arrayBuffer = await file.arrayBuffer();
-                musicAudioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-            } catch (error) {
-                console.error("Music decode error:", error);
-                alert("楽曲のデコードに失敗しました。");
-                return;
-            }
-
-            try {
-                await saveData('files', { id: 'music', name: file.name, data: file });
-            } catch (error) {
-                console.error("Failed to save music to DB:", error);
-            }
-
-            const lines = editor.value.split('\n');
-            let waveLineFound = false;
-            const newLines = lines.map(line => {
-                if (line.trim().toUpperCase().startsWith('WAVE:')) {
-                    waveLineFound = true;
-                    return `WAVE:${file.name}`;
-                }
-                return line;
-            });
-            if (!waveLineFound) {
-                let inserted = false;
-                const waveLine = `WAVE:${file.name}`;
-                for (let i = 0; i < newLines.length; i++) {
-                    const upperLine = newLines[i].trim().toUpperCase();
-                    if (upperLine.startsWith('BPM:') || upperLine.startsWith('TITLE:')) {
-                        newLines.splice(i + 1, 0, waveLine);
-                        inserted = true;
-                        break;
-                    }
-                }
-                if (!inserted) newLines.unshift(waveLine);
-            }
-            editor.value = newLines.join('\n');
-            editor.dispatchEvent(new Event('input', { bubbles: true }));
+            try { const arrayBuffer = await file.arrayBuffer(); musicAudioBuffer = await audioContext.decodeAudioData(arrayBuffer); } catch (error) { alert("楽曲のデコードに失敗しました。"); return; }
+            try { await saveData('files', { id: 'music', name: file.name, data: file }); } catch (error) {}
+            const lines = editor.value.split('\n'); let waveLineFound = false;
+            const newLines = lines.map(line => { if (line.trim().toUpperCase().startsWith('WAVE:')) { waveLineFound = true; return `WAVE:${file.name}`; } return line; });
+            if (!waveLineFound) { let inserted = false; const waveLine = `WAVE:${file.name}`; for (let i = 0; i < newLines.length; i++) { const upperLine = newLines[i].trim().toUpperCase(); if (upperLine.startsWith('BPM:') || upperLine.startsWith('TITLE:')) { newLines.splice(i + 1, 0, waveLine); inserted = true; break; } } if (!inserted) newLines.unshift(waveLine); }
+            editor.value = newLines.join('\n'); editor.dispatchEvent(new Event('input', { bubbles: true }));
         }
 
-        document.getElementById('musicFileInput').addEventListener('change', (event) => {
-            const file = event.target.files[0];
-            if (!file) return;
-            handleMusicUpload(file);
-            event.target.value = null;
-        });
+        document.getElementById('musicFileInput').addEventListener('change', (event) => { const file = event.target.files[0]; if (!file) return; handleMusicUpload(file); event.target.value = null; });
 
         editor.addEventListener('input', () => {
             localStorage.setItem('tjaContent', editor.value);
-            const oldMeasureIndex = currentMeasureIndex;
-            const oldCourseKey = currentChart ? currentChart.courseName : 3;
-            const wasPlaying = isPlaying;
-            
-            allCourses = parseTJA(editor.value);
-            updateCourseSelect();
-            
-            if (allCourses.courses[oldCourseKey]) {
-                currentChart = allCourses.courses[oldCourseKey];
-                courseSelect.value = oldCourseKey;
-            } else {
-                const selectedKey = parseInt(courseSelect.value, 10);
-                currentChart = allCourses.courses[selectedKey] || null;
-            }
-            
-            let newTime = 0;
-            if (currentChart && currentChart.allMeasureTimes.length > 0) {
-                if (oldMeasureIndex < currentChart.allMeasureTimes.length) newTime = currentChart.allMeasureTimes[oldMeasureIndex];
-                else newTime = currentChart.allMeasureTimes[currentChart.allMeasureTimes.length - 1];
-            }
-            
-            // 再生中の場合は停止せずに状態を保持
-            if (wasPlaying) {
-                const currentPlayTime = currentElapsedTime;
-                setChartTime(newTime);
-                currentElapsedTime = currentPlayTime;
-                seekChartState(currentElapsedTime);
-            } else {
-                setChartTime(newTime);
-            }
+            const oldMeasureIndex = currentMeasureIndex; const oldCourseKey = currentChart ? currentChart.courseName : 3; const wasPlaying = isPlaying;
+            allCourses = parseTJA(editor.value); updateCourseSelect(); updateEditorGutter(); updateCursorPosition();
+            if (allCourses.courses[oldCourseKey]) { currentChart = allCourses.courses[oldCourseKey]; courseSelect.value = oldCourseKey; } else { const selectedKey = parseInt(courseSelect.value, 10); currentChart = allCourses.courses[selectedKey] || null; }
+            let newTime = 0; if (currentChart && currentChart.allMeasureTimes.length > 0) { if (oldMeasureIndex < currentChart.allMeasureTimes.length) newTime = currentChart.allMeasureTimes[oldMeasureIndex]; else newTime = currentChart.allMeasureTimes[currentChart.allMeasureTimes.length - 1]; }
+            if (wasPlaying) { const currentPlayTime = currentElapsedTime; setChartTime(newTime); currentElapsedTime = currentPlayTime; seekChartState(currentElapsedTime); } else { setChartTime(newTime); }
         });
         
         playButton.addEventListener('click', togglePlay);
-        
-        // リサイズ時は再生を継続
-        window.addEventListener('resize', () => { 
-            resizeCanvas(); 
-            if (!isPlaying) {
-                updatePreview(); 
-            }
-        });
+        window.addEventListener('resize', () => { resizeCanvas(); if (!isPlaying) { updatePreview(); } });
 
-        const settingsModal = document.getElementById('settingsModal'); const helpModal = document.getElementById('helpModal'); const closeSettingsButton = document.getElementById('closeSettingsButton'); const saveSettingsButton = document.getElementById('saveSettingsButton'); const showHelpButton = document.getElementById('showHelpButton'); const closeHelpButton = document.getElementById('closeHelpButton'); const autoPlaySetting = document.getElementById('autoPlaySetting'); const keyDonL = document.getElementById('keyDonL'), keyDonR = document.getElementById('keyDonR'), keyKaL = document.getElementById('keyKaL'), keyKaR = document.getElementById('keyKaR'); const autoRollSpeedSetting = document.getElementById('autoRollSpeedSetting'); const renderFpsSetting = document.getElementById('renderFpsSetting'); const scrollSpeedSetting = document.getElementById('scrollSpeedSetting'); const playbackSpeedSetting = document.getElementById('playbackSpeedSetting'); const editorBgColorSetting = document.getElementById('editorBgColorSetting'); const editorFgColorSetting = document.getElementById('editorFgColorSetting'); const editorFontSizeSetting = document.getElementById('editorFontSizeSetting'); const exportEncodingSetting = document.getElementById('exportEncodingSetting'); const musicVolumeSetting = document.getElementById('musicVolumeSetting'); const seVolumeSetting = document.getElementById('seVolumeSetting');
+        const settingsModal = document.getElementById('settingsModal'); const helpModal = document.getElementById('helpModal'); const closeSettingsButton = document.getElementById('closeSettingsButton'); const saveSettingsButton = document.getElementById('saveSettingsButton'); const showHelpButton = document.getElementById('showHelpButton'); const closeHelpButton = document.getElementById('closeHelpButton');
+        const autoPlaySetting = document.getElementById('autoPlaySetting'); const keyDonL = document.getElementById('keyDonL'), keyDonR = document.getElementById('keyDonR'), keyKaL = document.getElementById('keyKaL'), keyKaR = document.getElementById('keyKaR'); const autoRollSpeedSetting = document.getElementById('autoRollSpeedSetting'); const renderFpsSetting = document.getElementById('renderFpsSetting'); const scrollSpeedSetting = document.getElementById('scrollSpeedSetting'); const playbackSpeedSetting = document.getElementById('playbackSpeedSetting'); const editorBgColorSetting = document.getElementById('editorBgColorSetting'); const editorFgColorSetting = document.getElementById('editorFgColorSetting'); const editorFontSizeSetting = document.getElementById('editorFontSizeSetting'); const exportEncodingSetting = document.getElementById('exportEncodingSetting'); const musicVolumeSetting = document.getElementById('musicVolumeSetting'); const seVolumeSetting = document.getElementById('seVolumeSetting');
         
-        function openSettings() { autoPlaySetting.checked = isAutoPlay; keyDonL.value = playerKeys.donL.join(','); keyDonR.value = playerKeys.donR.join(','); keyKaL.value = playerKeys.kaL.join(','); keyKaR.value = playerKeys.kaR.join(','); autoRollSpeedSetting.value = autoRollSpeed; renderFpsSetting.value = renderFPS; scrollSpeedSetting.value = scrollMultiplier; playbackSpeedSetting.value = playbackSpeed; editorBgColorSetting.value = editorBgColor; editorFgColorSetting.value = editorFgColor; editorFontSizeSetting.value = editorFontSize; exportEncodingSetting.value = exportEncoding; musicVolumeSetting.value = musicVolume * 100; seVolumeSetting.value = seVolume * 100; settingsModal.style.display = 'flex'; }
+        function openSettings() { 
+            autoPlaySetting.checked = isAutoPlay; 
+            keyDonL.value = playerKeys.donL.join(','); keyDonR.value = playerKeys.donR.join(','); keyKaL.value = playerKeys.kaL.join(','); keyKaR.value = playerKeys.kaR.join(','); 
+            autoRollSpeedSetting.value = autoRollSpeed; renderFpsSetting.value = renderFPS; scrollSpeedSetting.value = scrollMultiplier; playbackSpeedSetting.value = playbackSpeed; editorBgColorSetting.value = editorBgColor; editorFgColorSetting.value = editorFgColor; editorFontSizeSetting.value = editorFontSize; exportEncodingSetting.value = exportEncoding; musicVolumeSetting.value = musicVolume * 100; seVolumeSetting.value = seVolume * 100; 
+            document.getElementById('isFixedBpmEnabledSetting').checked = isFixedBpmEnabled; document.getElementById('fixedBpmValueSetting').value = fixedBpmValue; document.getElementById('isWaveformEnabledSetting').checked = isWaveformEnabled; document.getElementById('showGridLinesSetting').checked = showGridLines;
+            settingsModal.style.display = 'flex'; 
+        }
         function closeSettings() { settingsModal.style.display = 'none'; }
+        
         function applySettings() { 
             updateAutoDisplay(); 
-            editor.style.backgroundColor = editorBgColor; 
-            editor.style.color = editorFgColor; 
-            editor.style.fontSize = `${editorFontSize}px`; 
-            if (musicGainNode) musicGainNode.gain.value = musicVolume; 
-            if (seGainNode) seGainNode.gain.value = seVolume; 
+            editor.style.backgroundColor = editorBgColor; editor.style.color = editorFgColor; editor.style.fontSize = `${editorFontSize}px`; 
+            if (musicGainNode) musicGainNode.gain.value = musicVolume; if (seGainNode) seGainNode.gain.value = seVolume; 
+            updateEditorGutter();
             if (!isPlaying) { updatePreview(); } 
         }
         
         function saveSettings() { 
-            const oldPlaybackSpeed = playbackSpeed; 
-            const wasPlaying = isPlaying;
-            
+            const oldPlaybackSpeed = playbackSpeed; const wasPlaying = isPlaying;
             isAutoPlay = autoPlaySetting.checked; 
-            playerKeys.donL = keyDonL.value.toUpperCase().split(',').map(k => k.trim()).filter(Boolean); 
-            playerKeys.donR = keyDonR.value.toUpperCase().split(',').map(k => k.trim()).filter(Boolean); 
-            playerKeys.kaL = keyKaL.value.toUpperCase().split(',').map(k => k.trim()).filter(Boolean); 
-            playerKeys.kaR = keyKaR.value.toUpperCase().split(',').map(k => k.trim()).filter(Boolean); 
-            autoRollSpeed = parseInt(autoRollSpeedSetting.value, 10) || 60; 
-            renderFPS = parseInt(renderFpsSetting.value, 10) || 60; 
-            scrollMultiplier = parseFloat(scrollSpeedSetting.value) || 1.0; 
-            playbackSpeed = parseFloat(playbackSpeedSetting.value) || 1.0; 
-            editorBgColor = editorBgColorSetting.value; 
-            editorFgColor = editorFgColorSetting.value; 
-            editorFontSize = parseInt(editorFontSizeSetting.value, 10) || 14; 
-            exportEncoding = exportEncodingSetting.value; 
-            musicVolume = parseFloat(musicVolumeSetting.value) / 100; 
-            seVolume = parseFloat(seVolumeSetting.value) / 100; 
+            playerKeys.donL = keyDonL.value.toUpperCase().split(',').map(k => k.trim()).filter(Boolean); playerKeys.donR = keyDonR.value.toUpperCase().split(',').map(k => k.trim()).filter(Boolean); playerKeys.kaL = keyKaL.value.toUpperCase().split(',').map(k => k.trim()).filter(Boolean); playerKeys.kaR = keyKaR.value.toUpperCase().split(',').map(k => k.trim()).filter(Boolean); 
+            autoRollSpeed = parseInt(autoRollSpeedSetting.value, 10) || 60; renderFPS = parseInt(renderFpsSetting.value, 10) || 240; scrollMultiplier = parseFloat(scrollSpeedSetting.value) || 1.0; playbackSpeed = parseFloat(playbackSpeedSetting.value) || 1.0; editorBgColor = editorBgColorSetting.value; editorFgColor = editorFgColorSetting.value; editorFontSize = parseInt(editorFontSizeSetting.value, 10) || 14; exportEncoding = exportEncodingSetting.value; musicVolume = parseFloat(musicVolumeSetting.value) / 100; seVolume = parseFloat(seVolumeSetting.value) / 100; 
+            isFixedBpmEnabled = document.getElementById('isFixedBpmEnabledSetting').checked; fixedBpmValue = parseInt(document.getElementById('fixedBpmValueSetting').value, 10) || 200; isWaveformEnabled = document.getElementById('isWaveformEnabledSetting').checked; showGridLines = document.getElementById('showGridLinesSetting').checked;
             
-            localStorage.setItem('tjaEditorSettings_v4', JSON.stringify({ isAutoPlay, playerKeys, autoRollSpeed, renderFPS, scrollMultiplier, playbackSpeed, editorBgColor, editorFgColor, editorFontSize, exportEncoding, musicVolume, seVolume })); 
+            localStorage.setItem('tjaEditorSettings_v5', JSON.stringify({ isAutoPlay, playerKeys, autoRollSpeed, renderFPS, scrollMultiplier, playbackSpeed, editorBgColor, editorFgColor, editorFontSize, exportEncoding, musicVolume, seVolume, isFixedBpmEnabled, fixedBpmValue, isWaveformEnabled, showGridLines })); 
             applySettings(); 
             
             if (oldPlaybackSpeed !== playbackSpeed) { 
-                const oldMeasureIndex = currentMeasureIndex; 
-                const oldCourseKey = currentChart ? currentChart.courseName : 3; 
-                
-                allCourses = parseTJA(editor.value); 
-                updateCourseSelect(); 
-                
-                if (allCourses.courses[oldCourseKey]) { 
-                    currentChart = allCourses.courses[oldCourseKey]; 
-                    courseSelect.value = oldCourseKey; 
-                } else { 
-                    const selectedKey = parseInt(courseSelect.value, 10); 
-                    currentChart = allCourses.courses[selectedKey] || null; 
-                } 
-                
-                let newTime = 0; 
-                if (currentChart && currentChart.allMeasureTimes.length > 0) { 
-                    if (oldMeasureIndex < currentChart.allMeasureTimes.length) newTime = currentChart.allMeasureTimes[oldMeasureIndex]; 
-                    else newTime = currentChart.allMeasureTimes[currentChart.allMeasureTimes.length - 1]; 
-                }
-                
-                if (wasPlaying) {
-                    const currentPlayTime = currentElapsedTime;
-                    stopSimulation();
-                    setChartTime(newTime);
-                    currentElapsedTime = currentPlayTime;
-                    seekChartState(currentElapsedTime);
-                    startSimulation(); // AudioBufferSourceNodeを作り直すためリスタート
-                } else {
-                    setChartTime(newTime);
-                }
+                const oldMeasureIndex = currentMeasureIndex; const oldCourseKey = currentChart ? currentChart.courseName : 3; 
+                allCourses = parseTJA(editor.value); updateCourseSelect(); updateEditorGutter(); updateCursorPosition();
+                if (allCourses.courses[oldCourseKey]) { currentChart = allCourses.courses[oldCourseKey]; courseSelect.value = oldCourseKey; } else { const selectedKey = parseInt(courseSelect.value, 10); currentChart = allCourses.courses[selectedKey] || null; } 
+                let newTime = 0; if (currentChart && currentChart.allMeasureTimes.length > 0) { if (oldMeasureIndex < currentChart.allMeasureTimes.length) newTime = currentChart.allMeasureTimes[oldMeasureIndex]; else newTime = currentChart.allMeasureTimes[currentChart.allMeasureTimes.length - 1]; }
+                if (wasPlaying) { const currentPlayTime = currentElapsedTime; stopSimulation(); setChartTime(newTime); currentElapsedTime = currentPlayTime; seekChartState(currentElapsedTime); startSimulation(); } else { setChartTime(newTime); }
             } 
-            
             closeSettings(); 
         }
         
-        function loadSettings() { try { const saved = localStorage.getItem('tjaEditorSettings_v4'); if (saved) { const s = JSON.parse(saved); isAutoPlay = s.isAutoPlay ?? true; playerKeys = s.playerKeys ?? { donL: ['F'], donR: ['J'], kaL: ['D'], kaR: ['K'] }; autoRollSpeed = s.autoRollSpeed ?? 60; renderFPS = s.renderFPS ?? 60; scrollMultiplier = s.scrollMultiplier ?? 1.0; playbackSpeed = s.playbackSpeed ?? 1.0; editorBgColor = s.editorBgColor ?? '#111827'; editorFgColor = s.editorFgColor ?? '#22c55e'; editorFontSize = s.editorFontSize ?? 14; exportEncoding = s.exportEncoding ?? 'SJIS'; musicVolume = s.musicVolume ?? 1.0; seVolume = s.seVolume ?? 1.0; } } catch (e) { console.error("Failed to load settings from localStorage", e); } }
+        function loadSettings() { 
+            try { 
+                const saved = localStorage.getItem('tjaEditorSettings_v5') || localStorage.getItem('tjaEditorSettings_v4'); 
+                if (saved) { 
+                    const s = JSON.parse(saved); 
+                    isAutoPlay = s.isAutoPlay ?? true; playerKeys = s.playerKeys ?? { donL: ['F'], donR: ['J'], kaL: ['D'], kaR: ['K'] }; autoRollSpeed = s.autoRollSpeed ?? 60; renderFPS = s.renderFPS ?? 240; scrollMultiplier = s.scrollMultiplier ?? 1.0; playbackSpeed = s.playbackSpeed ?? 1.0; editorBgColor = s.editorBgColor ?? '#111827'; editorFgColor = s.editorFgColor ?? '#4ade80'; editorFontSize = s.editorFontSize ?? 14; exportEncoding = s.exportEncoding ?? 'SJIS'; musicVolume = s.musicVolume ?? 1.0; seVolume = s.seVolume ?? 1.0; 
+                    isFixedBpmEnabled = s.isFixedBpmEnabled ?? false; fixedBpmValue = s.fixedBpmValue ?? 200; isWaveformEnabled = s.isWaveformEnabled ?? false; showGridLines = s.showGridLines ?? true;
+                } 
+            } catch (e) { console.error("Failed to load settings", e); } 
+        }
         
         async function exportTJA() {
-            const text = editor.value;
-            let title = "chart";
-            const titleMatch = text.match(/^TITLE:(.+)$/m);
-            if (titleMatch && titleMatch[1]) {
-                title = titleMatch[1].trim();
-            }
-
+            const text = editor.value; let title = "chart"; const titleMatch = text.match(/^TITLE:(.+)$/m); if (titleMatch && titleMatch[1]) { title = titleMatch[1].trim(); }
             const encoding = exportEncoding === 'UTF8' ? 'UTF8' : 'SJIS';
-            
-            const convertedArray = Encoding.convert(text, {
-                to: encoding,
-                from: 'AUTO',
-                type: 'array'
-            });
-
-            const uint8Array = new Uint8Array(convertedArray);
-            const blob = new Blob([uint8Array], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${title}.tja`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            const convertedArray = Encoding.convert(text, { to: encoding, from: 'AUTO', type: 'array' });
+            const uint8Array = new Uint8Array(convertedArray); const blob = new Blob([uint8Array], { type: 'text/plain' }); const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = `${title}.tja`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
         }
 
         document.getElementById('exportTjaButton').addEventListener('click', (e) => { e.preventDefault(); exportTJA(); });
@@ -1342,36 +1354,27 @@ BALLOON:10
         document.querySelectorAll('.se-export-button').forEach(btn => btn.addEventListener('click', () => { const key = btn.dataset.seKey; const base64 = localStorage.getItem(`se_${key}`); if (base64) { const a = document.createElement('a'); a.href = base64; a.download = `${key}.ogg`; a.click(); } else { alert('エクスポートするSEが保存されていません。'); } }));
         
         async function initialLoad() {
-            await initDB();
-            loadSettings();
-            
-            const savedTja = localStorage.getItem('tjaContent');
-            if (savedTja) {
-                editor.value = savedTja;
-            }
+            await initDB(); loadSettings();
+            const savedTja = localStorage.getItem('tjaContent'); if (savedTja) editor.value = savedTja;
 
             try {
                 const musicFile = await loadData('files', 'music');
                 if (musicFile && musicFile.data) {
-                    uploadedMusicObjectURL = URL.createObjectURL(musicFile.data);
-                    uploadedMusicFileName = musicFile.name;
-                    musicFileName.textContent = `楽曲: ${musicFile.name}`;
-                    
-                    initializeAudio();
-                    const arrayBuffer = await musicFile.data.arrayBuffer();
-                    musicAudioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                    uploadedMusicObjectURL = URL.createObjectURL(musicFile.data); uploadedMusicFileName = musicFile.name; musicFileName.textContent = `楽曲: ${musicFile.name}`;
+                    initializeAudio(); const arrayBuffer = await musicFile.data.arrayBuffer(); musicAudioBuffer = await audioContext.decodeAudioData(arrayBuffer);
                 }
-            } catch (error) {
-                console.error("Failed to load music from DB:", error);
-            }
+            } catch (error) {}
             
             applySettings();
-            allCourses = parseTJA(editor.value);
-            updateCourseSelect();
-            const initialKey = parseInt(courseSelect.value, 10);
-            currentChart = allCourses.courses[initialKey] || null;
-            setChartTime(0);
-            initializeAudio();
+            allCourses = parseTJA(editor.value); updateCourseSelect(); 
+            const initialKey = parseInt(courseSelect.value, 10); currentChart = allCourses.courses[initialKey] || null;
+            setChartTime(0); initializeAudio();
+
+            // DOM 描画後に確実に更新
+            setTimeout(() => {
+                updateEditorGutter(); 
+                updateCursorPosition();
+            }, 100);
         }
 
         initialLoad();
