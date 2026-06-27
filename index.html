@@ -1904,7 +1904,12 @@ BALLOON:10
             reader.onload = async (e) => {
                 try {
                     const project = JSON.parse(e.target.result); let importedData = [];
-                    if (project.tja) { editor.value = project.tja; lastParsedTjaContent = project.tja; localStorage.setItem('tjaContent', project.tja); importedData.push("譜面データ"); }
+                    if (project.tja) { 
+                        editor.value = project.tja; 
+                        lastParsedTjaContent = null; 
+                        localStorage.setItem('tjaContent', project.tja); 
+                        importedData.push("譜面データ"); 
+                    }
                     if (project.settings) { localStorage.setItem('tjaEditorSettings_v6', project.settings); loadSettings(); applySettings(); importedData.push("設定"); }
                     if (project.se) { if (project.se.don) localStorage.setItem('se_don', project.se.don); if (project.se.ka) localStorage.setItem('se_ka', project.se.ka); if (project.se.balloon) localStorage.setItem('se_balloon', project.se.balloon); if (currentHitSoundSet === 'default') applyHitSoundSet(); if (!importedData.includes("設定")) importedData.push("効果音(SE)"); }
                     let hasDbSe = false;
@@ -1914,7 +1919,16 @@ BALLOON:10
                     if (project.currentComboVoiceSet) { currentComboVoiceSet = project.currentComboVoiceSet; localStorage.setItem('currentComboVoiceSet', currentComboVoiceSet); }
                     if (hasDbSe) { await updateHitSoundSelect(); await updateComboVoiceSelect(); applyHitSoundSet(); applyComboVoiceSet(); if (!importedData.includes("コンボボイス・打音セット")) importedData.push("コンボボイス・打音セット"); }
                     if (project.detailsState) { const detailsElements = document.querySelectorAll('#settingsModal details'); project.detailsState.forEach((state, i) => { if (detailsElements[i]) detailsElements[i].open = state; }); }
-                    if (project.music && project.music.data) { const blob = base64ToBlob(project.music.data); const musicFile = new File([blob], project.music.name, { type: blob.type }); await handleMusicUpload(musicFile); if (!importedData.includes("譜面データ")) importedData.push("楽曲"); } else if (project.tja) { editor.dispatchEvent(new Event('input', { bubbles: true })); if (!isLivePreviewEnabled) applyEditorChange(); }
+                    
+                    if (project.music && project.music.data) { 
+                        const blob = base64ToBlob(project.music.data); 
+                        const musicFile = new File([blob], project.music.name, { type: blob.type }); 
+                        await handleMusicUpload(musicFile); 
+                        if (!importedData.includes("楽曲")) importedData.push("楽曲"); 
+                    } else if (project.tja) { 
+                        applyEditorChange(); 
+                    }
+                    
                     if(importedData.length > 0) { alert(`プロジェクトから以下を読み込みました:\n・${importedData.join('\n・')}`); } else { alert('有効なデータが見つかりませんでした。'); }
                 } catch(err) { alert('プロジェクトファイルの読み込みに失敗しました。'); console.error(err); }
             };
@@ -1967,4 +1981,4 @@ BALLOON:10
     </script>
 </body>
 
-    </html>
+</html>
