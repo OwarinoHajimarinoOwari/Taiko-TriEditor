@@ -404,7 +404,7 @@ BALLOON:10
             regularCount: 0
         };
 
-        const cullBufferObj = { size: 0, drawn1: null, drawn2: null, drawn3: null, drawn4: null, drawnBar: null, drawnGrid: null };
+        const cullBufferObj = { size: 0, drawn1: null, drawn2: null, drawn3: null, drawn4: null, drawn7: null, drawnBar: null, drawnGrid: null };
 
         function initCullBuffer(canvasWidth, margin) {
             const requiredSize = (canvasWidth + margin * 2 + 100) * 4; // 0.25px 単位の解像度
@@ -414,12 +414,13 @@ BALLOON:10
                 cullBufferObj.drawn2 = new Int32Array(requiredSize);
                 cullBufferObj.drawn3 = new Int32Array(requiredSize);
                 cullBufferObj.drawn4 = new Int32Array(requiredSize);
+                cullBufferObj.drawn7 = new Int32Array(requiredSize);
                 cullBufferObj.drawnBar = new Int32Array(requiredSize);
                 cullBufferObj.drawnGrid = new Int32Array(requiredSize);
                 
-                cullBufferObj.drawn1.fill(-999999); cullBufferObj.drawn2.fill(-999999); cullBufferObj.drawn3.fill(-999999); cullBufferObj.drawn4.fill(-999999); cullBufferObj.drawnBar.fill(-999999); cullBufferObj.drawnGrid.fill(-999999);
+                cullBufferObj.drawn1.fill(-999999); cullBufferObj.drawn2.fill(-999999); cullBufferObj.drawn3.fill(-999999); cullBufferObj.drawn4.fill(-999999); cullBufferObj.drawn7.fill(-999999); cullBufferObj.drawnBar.fill(-999999); cullBufferObj.drawnGrid.fill(-999999);
             } else {
-                cullBufferObj.drawn1.fill(-999999); cullBufferObj.drawn2.fill(-999999); cullBufferObj.drawn3.fill(-999999); cullBufferObj.drawn4.fill(-999999); cullBufferObj.drawnBar.fill(-999999); cullBufferObj.drawnGrid.fill(-999999);
+                cullBufferObj.drawn1.fill(-999999); cullBufferObj.drawn2.fill(-999999); cullBufferObj.drawn3.fill(-999999); cullBufferObj.drawn4.fill(-999999); cullBufferObj.drawn7.fill(-999999); cullBufferObj.drawnBar.fill(-999999); cullBufferObj.drawnGrid.fill(-999999);
             }
         }
 
@@ -875,18 +876,19 @@ BALLOON:10
                 addToBin(note, true); 
             }
 
-            const lastAdopted = { '1': null, '2': null, '3': null, '4': null };
+            const lastAdopted = { '1': null, '2': null, '3': null, '4': null, '7': null };
             for (let note of chart.regularArr) { 
                 if (note.type === '0') continue;
                 
-                if (note.type >= '1' && note.type <= '4' && note.distance !== undefined) {
+                if ((note.type >= '1' && note.type <= '4' || note.type === '7') && note.distance !== undefined) {
                     const last = lastAdopted[note.type];
                     if (last &&
                         Math.abs(note.distance - last.distance) < 0.1 &&
                         Math.abs(note.time - last.time) < 0.1 &&
                         note.scroll === last.scroll &&
                         note.scrollY === last.scrollY &&
-                        note.bpm === last.bpm) {
+                        note.bpm === last.bpm &&
+                        (note.type !== '7' || note.hits === last.hits)) {
                         continue; 
                     }
                     lastAdopted[note.type] = note;
@@ -1226,7 +1228,7 @@ BALLOON:10
             initCullBuffer(canvasWidth, canvasMargin);
             const cullOffsetPx = canvasMargin * 4; 
             const cullLimit = cullBufferObj.size;
-            const drawn1 = cullBufferObj.drawn1, drawn2 = cullBufferObj.drawn2, drawn3 = cullBufferObj.drawn3, drawn4 = cullBufferObj.drawn4, drawnBar = cullBufferObj.drawnBar, drawnGrid = cullBufferObj.drawnGrid;
+            const drawn1 = cullBufferObj.drawn1, drawn2 = cullBufferObj.drawn2, drawn3 = cullBufferObj.drawn3, drawn4 = cullBufferObj.drawn4, drawn7 = cullBufferObj.drawn7, drawnBar = cullBufferObj.drawnBar, drawnGrid = cullBufferObj.drawnGrid;
 
             const distNow = getDistanceAtTime(chart, currentElapsedTime);
             const binIndex = Math.floor(currentElapsedTime / BIN_SIZE);
@@ -1293,20 +1295,28 @@ BALLOON:10
                 let skip = false;
                 if (note.type >= '1' && note.type <= '4') {
                     if (note.judgeResult === 'hit' || (x < -canvasMargin || x > canvasWidth + canvasMargin || y < -canvasMargin || y > canvasHeight + canvasMargin)) skip = true;
-                    if (!skip) {
-                        const px = Math.floor(x * 4) + cullOffsetPx;
-                        const py = Math.floor(y * 4);
-                        if (px >= 0 && px < cullLimit) {
-                            if (note.type === '1') { if (drawn1[px] === py) skip = true; else drawn1[px] = py; }
-                            else if (note.type === '2') { if (drawn2[px] === py) skip = true; else drawn2[px] = py; }
-                            else if (note.type === '3') { if (drawn3[px] === py) skip = true; else drawn3[px] = py; }
-                            else if (note.type === '4') { if (drawn4[px] === py) skip = true; else drawn4[px] = py; }
-                        }
-                    }
                 } else if (note.type === '5' || note.type === '6') {
                     if ((x < -canvasMargin && endX < -canvasMargin) || (x > canvasWidth + canvasMargin && endX > canvasWidth + canvasMargin) || (y < -canvasMargin && endY < -canvasMargin) || (y > canvasHeight + canvasMargin && endY > canvasHeight + canvasMargin)) skip = true;
                 } else if (note.type === '7') {
-                    if (note.judgeResult === 'hit' || note.judgeResult === 'miss') skip = true;
+                    if (note.judgeResult === 'hit' || note.judgeResult === 'miss' || (x < -canvasMargin || x > canvasWidth + canvasMargin || y < -canvasMargin || y > canvasHeight + canvasMargin)) skip = true;
+                }
+
+                if (!skip && (note.type >= '1' && note.type <= '4' || note.type === '7')) {
+                    const px = Math.floor(x * 4) + cullOffsetPx;
+                    const py = Math.floor(y * 4);
+                    if (px >= 0 && px < cullLimit) {
+                        if (note.type === '1') { if (drawn1[px] === py) skip = true; else drawn1[px] = py; }
+                        else if (note.type === '2') { if (drawn2[px] === py) skip = true; else drawn2[px] = py; }
+                        else if (note.type === '3') { if (drawn3[px] === py) skip = true; else drawn3[px] = py; }
+                        else if (note.type === '4') { if (drawn4[px] === py) skip = true; else drawn4[px] = py; }
+                        else if (note.type === '7') {
+                            let angle = 0; if (ppsX !== 0 || ppsY !== 0) angle = Math.atan2(ppsY, ppsX);
+                            let angleDeg = Math.floor((angle + Math.PI) * 180 / Math.PI);
+                            let safePy = py + 10000;
+                            let packedVal = safePy * 1000 + angleDeg;
+                            if (drawn7[px] === packedVal) skip = true; else drawn7[px] = packedVal;
+                        }
+                    }
                 }
 
                 if (skip) continue;
@@ -1373,7 +1383,7 @@ BALLOON:10
             initCullBuffer(canvasWidth, canvasMargin);
             const cullOffsetPx = canvasMargin * 4; 
             const cullLimit = cullBufferObj.size;
-            const drawn1 = cullBufferObj.drawn1, drawn2 = cullBufferObj.drawn2, drawn3 = cullBufferObj.drawn3, drawn4 = cullBufferObj.drawn4, drawnBar = cullBufferObj.drawnBar, drawnGrid = cullBufferObj.drawnGrid;
+            const drawn1 = cullBufferObj.drawn1, drawn2 = cullBufferObj.drawn2, drawn3 = cullBufferObj.drawn3, drawn4 = cullBufferObj.drawn4, drawn7 = cullBufferObj.drawn7, drawnBar = cullBufferObj.drawnBar, drawnGrid = cullBufferObj.drawnGrid;
 
             const distNow = getDistanceAtTime(currentChart, elapsedTime);
             const binIndex = Math.floor(elapsedTime / BIN_SIZE);
@@ -1436,11 +1446,15 @@ BALLOON:10
                 const x = pos.x, y = pos.y, endX = pos.endX, endY = pos.endY, ppsX = pos.ppsX, ppsY = pos.ppsY;
                 
                 let skip = false;
-                if (note.type < '5' || (note.type === '7' && (note.judgeResult === 'hit' || note.judgeResult === 'miss'))) { if (x < -canvasMargin || x > canvasWidth + canvasMargin || y < -canvasMargin || y > canvasHeight + canvasMargin) skip = true; } 
-                if (!skip && (note.type === '5' || note.type === '6' || (note.type === '7' && note.judgeResult === 'pending'))) { if ((x < -canvasMargin && endX < -canvasMargin) || (x > canvasWidth + canvasMargin && endX > canvasWidth + canvasMargin) || (y < -canvasMargin && endY < -canvasMargin) || (y > canvasHeight + canvasMargin && endY > canvasHeight + canvasMargin)) skip = true; } 
-                if (!skip && note.judgeResult === 'hit' && (note.type >= '1' && note.type <= '4')) { skip = true; } 
-                
-                if (!skip && note.type >= '1' && note.type <= '4') {
+                if (note.type >= '1' && note.type <= '4') {
+                    if (note.judgeResult === 'hit' || (x < -canvasMargin || x > canvasWidth + canvasMargin || y < -canvasMargin || y > canvasHeight + canvasMargin)) skip = true;
+                } else if (note.type === '5' || note.type === '6') {
+                    if ((x < -canvasMargin && endX < -canvasMargin) || (x > canvasWidth + canvasMargin && endX > canvasWidth + canvasMargin) || (y < -canvasMargin && endY < -canvasMargin) || (y > canvasHeight + canvasMargin && endY > canvasHeight + canvasMargin)) skip = true;
+                } else if (note.type === '7') {
+                    if (note.judgeResult === 'hit' || note.judgeResult === 'miss' || (x < -canvasMargin || x > canvasWidth + canvasMargin || y < -canvasMargin || y > canvasHeight + canvasMargin)) skip = true;
+                }
+
+                if (!skip && (note.type >= '1' && note.type <= '4' || note.type === '7')) {
                     const px = Math.floor(x * 4) + cullOffsetPx;
                     const py = Math.floor(y * 4);
                     if (px >= 0 && px < cullLimit) {
@@ -1448,6 +1462,13 @@ BALLOON:10
                         else if (note.type === '2') { if (drawn2[px] === py) skip = true; else drawn2[px] = py; }
                         else if (note.type === '3') { if (drawn3[px] === py) skip = true; else drawn3[px] = py; }
                         else if (note.type === '4') { if (drawn4[px] === py) skip = true; else drawn4[px] = py; }
+                        else if (note.type === '7') {
+                            let angle = 0; if (ppsX !== 0 || ppsY !== 0) angle = Math.atan2(ppsY, ppsX);
+                            let angleDeg = Math.floor((angle + Math.PI) * 180 / Math.PI);
+                            let safePy = py + 10000;
+                            let packedVal = safePy * 1000 + angleDeg;
+                            if (drawn7[px] === packedVal) skip = true; else drawn7[px] = packedVal;
+                        }
                     }
                 }
 
@@ -1819,7 +1840,10 @@ BALLOON:10
         
         function applySettings() { 
             buildFastKeyMap(); updateAutoDisplay(); 
-            editor.style.backgroundColor = editorBgColor; editor.style.color = editorFgColor; editor.style.fontSize = `${editorFontSize}px`; 
+            editor.style.backgroundColor = editorBgColor; 
+            editor.style.color = editorFgColor; 
+            editor.style.fontSize = `${editorFontSize}px`; 
+            editorGutter.style.fontSize = `${editorFontSize}px`; 
             if (musicGainNode) musicGainNode.gain.value = musicVolume; if (seGainNode) seGainNode.gain.value = seVolume; if (comboVoiceGainNode) comboVoiceGainNode.gain.value = comboVoiceVolume;
             updateEditorGutter(); if (!isPlaying) updatePreview(); 
         }
