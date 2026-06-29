@@ -90,7 +90,7 @@
         </div>
         
         <input type="file" id="tjaFileInput" accept=".tja" class="hidden">
-        <input type="file" id="musicFileInput" accept="audio/*,video/*,.mp3,.wav,.ogg,.flac,.m4a,.aac,.mp4,.webm,.opus,.wma,.amr,.aiff,.au,.mid,.midi,.rmi,.mka,.ac3,.dts,.vqf,.ape,.alac,.wv,.spx,.mogg,.tak,.tta,.ra,.rm,.rv,.mp1,.mp2,.mpc,.dsf,.dff,.oga,.mov,.avi,.mkv,.flv,.wmv,.asf,.m2ts,.ts,.3gp,.3g2,.mxf" class="hidden">
+        <input type="file" id="musicFileInput" accept="audio/*,video/*" class="hidden">
         <input type="file" id="projectFileInput" accept=".json" class="hidden">
         <input type="file" id="donSeInput" accept=".mp3,.wav,.ogg" class="hidden">
         <input type="file" id="kaSeInput" accept=".mp3,.wav,.ogg" class="hidden">
@@ -144,7 +144,7 @@ BALLOON:10
         </div>
     </div>
 
-    <!-- コンボやレーンなどが表示されるプレビュー画面 -->
+    <!-- プレビュー画面 -->
     <div id="preview-container" class="w-full relative" tabindex="0">
         <div class="lane"></div>
         <div class="hit-circle"><div class="hit-circle-small"></div></div>
@@ -186,7 +186,6 @@ BALLOON:10
     <div id="settingsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center" style="display: none; z-index: 100;">
         <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg text-gray-800 max-h-[90vh] overflow-y-auto">
             <h2 class="text-2xl font-bold mb-6">設定</h2>
-            
             <div class="space-y-4">
                 <details class="border border-gray-300 rounded-lg overflow-hidden relative" open>
                     <summary class="px-4 py-3 bg-gray-100 font-bold cursor-pointer hover:bg-gray-200 outline-none select-none">基本設定</summary>
@@ -394,7 +393,7 @@ BALLOON:10
         const settingsButton = document.getElementById('settingsButton');
         const autoStatus = document.getElementById('autoStatus');
 
-        // --- 軽量化のため、種類別カリング用バッファ（4倍解像度）を追加 ---
+        // --- オブジェクト再利用プール ---
         const renderBuffer = {
             barlines: Array.from({ length: 500 }, () => ({ note: null, x: 0, y: 0, ppsX: 0, ppsY: 0 })),
             barlinesCount: 0,
@@ -404,31 +403,23 @@ BALLOON:10
             regularCount: 0
         };
 
-        const cullBufferObj = { size: 0, drawn1: null, drawn2: null, drawn3: null, drawn4: null, drawn7: null, drawnBar: null, drawnGrid: null };
-
+        // --- 最適化されたフラットなカリングバッファ (Int32Array 1本に統合) ---
+        const cullBufferObj = { size: 0, buffer: null };
         function initCullBuffer(canvasWidth, margin) {
-            const requiredSize = (canvasWidth + margin * 2 + 100) * 4; // 0.25px 単位の解像度
+            // 解像度4倍(0.25px単位) × 7種類(1, 2, 3, 4, 7, Bar, Grid)
+            const requiredSize = (canvasWidth + margin * 2 + 100) * 4 * 7; 
             if (cullBufferObj.size < requiredSize) {
                 cullBufferObj.size = requiredSize;
-                cullBufferObj.drawn1 = new Int32Array(requiredSize);
-                cullBufferObj.drawn2 = new Int32Array(requiredSize);
-                cullBufferObj.drawn3 = new Int32Array(requiredSize);
-                cullBufferObj.drawn4 = new Int32Array(requiredSize);
-                cullBufferObj.drawn7 = new Int32Array(requiredSize);
-                cullBufferObj.drawnBar = new Int32Array(requiredSize);
-                cullBufferObj.drawnGrid = new Int32Array(requiredSize);
-                
-                cullBufferObj.drawn1.fill(-999999); cullBufferObj.drawn2.fill(-999999); cullBufferObj.drawn3.fill(-999999); cullBufferObj.drawn4.fill(-999999); cullBufferObj.drawn7.fill(-999999); cullBufferObj.drawnBar.fill(-999999); cullBufferObj.drawnGrid.fill(-999999);
-            } else {
-                cullBufferObj.drawn1.fill(-999999); cullBufferObj.drawn2.fill(-999999); cullBufferObj.drawn3.fill(-999999); cullBufferObj.drawn4.fill(-999999); cullBufferObj.drawn7.fill(-999999); cullBufferObj.drawnBar.fill(-999999); cullBufferObj.drawnGrid.fill(-999999);
+                cullBufferObj.buffer = new Int32Array(requiredSize);
             }
+            cullBufferObj.buffer.fill(-999999);
         }
 
         let audioContext, seGainNode, musicGainNode, comboVoiceGainNode;
         const audioBuffers = {};
         
         let musicAudioBuffer = null, musicSourceNode = null, autoSeSourceNode = null;
-        let isPlaying = false, animationFrameId = null, logicIntervalId = null, lastBPM = 120, currentCombo = 0, currentElapsedTime = 0.0, currentMeasureIndex = 0;
+        let isPlaying = false, isPreparing = false, animationFrameId = null, logicIntervalId = null, lastBPM = 120, currentCombo = 0, currentElapsedTime = 0.0, currentMeasureIndex = 0;
         let currentEditorLine = 0, highlightNoteLine = -1, highlightNoteCol = -1;
         let simulationStartOffset = 0, simulationStartTime = 0;
         let stopAtTime = null, chartCoolDownUntil = null, uploadedMusicFileName = null, uploadedMusicObjectURL = null;
@@ -439,7 +430,7 @@ BALLOON:10
         let lastParsedTjaContent = "";
 
         let isLivePreviewEnabled = true;
-        let scrollYDirection = -1; // -1: up(default), 1: down
+        let scrollYDirection = -1; 
         let isFixedBpmEnabled = false, fixedBpmValue = 200, isWaveformEnabled = false, showGridLines = true;
         let isAutoPlay = true, playerKeys = { donL: ['F'], donR: ['J'], kaL: ['D'], kaR: ['K'] }, autoRollSpeed = 60, renderFPS = 240, scrollMultiplier = 1.0, editorBgColor = '#111827', editorFgColor = '#4ade80', editorFontSize = 14, exportEncoding = 'SJIS', musicVolume = 1.0, seVolume = 1.0, comboVoiceVolume = 1.0, playbackSpeed = 1.0;
         const coolDownTime = 1.0;
@@ -690,7 +681,6 @@ BALLOON:10
         }
 
         function calculateEasing(t, type) { return t; }
-        function lowerBound(arr, time) { let lo = 0, hi = arr.length; while (lo < hi) { const mid = (lo + hi) >>> 1; if (arr[mid].time < time) lo = mid + 1; else hi = mid; } return lo; }
         
         function prepareChartCache(chart) { 
             if (!chart) return; 
@@ -757,61 +747,9 @@ BALLOON:10
             return lastMatch.startDist + (t - lastMatch.startTime) * lastMatch.bpm;
         }
 
-        const sharedNotePos = { hidden: false, x: 0, y: 0, endX: 0, endY: 0, ppsX: 0, ppsY: 0 };
-        function calcNotePos(chart, note, t, hitX, centerY, distNow) {
-            sharedNotePos.hidden = false;
-            let localDistNow = distNow;
-            if (note.sudden && (note.sudden.n > 0 || note.sudden.m > 0)) {
-                const timeDiff = note.time - t;
-                if (timeDiff > note.sudden.n) { sharedNotePos.hidden = true; return sharedNotePos; }
-                if (timeDiff > note.sudden.m) { t = note.time - note.sudden.m; localDistNow = getDistanceAtTime(chart, t); }
-            }
-
-            let isBM = chart.isBMScroll; let isHB = chart.isHBScroll;
-            if (isHB && isBM) isBM = false; 
-
-            let x, y, endX = 0, endY = 0, ppsX, ppsY;
-
-            if (!isFixedBpmEnabled && !isWaveformEnabled && (isBM || isHB)) {
-                let effScrollX = isHB ? note.scroll : 1.0; 
-                let effScrollY = (isHB ? (note.scrollY || 0.0) : 0.0) * scrollYDirection;
-                let distNote = note.distance !== undefined ? note.distance : getDistanceAtTime(chart, note.time);
-                let distDiff = distNote - localDistNow;
-                
-                x = hitX + distDiff * BASE_SCROLL_FACTOR * effScrollX * scrollMultiplier;
-                y = centerY + distDiff * BASE_SCROLL_FACTOR * effScrollY * scrollMultiplier;
-                ppsX = BASE_SCROLL_FACTOR * note.bpm * effScrollX * scrollMultiplier;
-                ppsY = BASE_SCROLL_FACTOR * note.bpm * effScrollY * scrollMultiplier;
-                
-                if (note.endTime !== undefined) {
-                    let distEnd = note.endDistance !== undefined ? note.endDistance : getDistanceAtTime(chart, note.endTime);
-                    let distDiffEnd = distEnd - localDistNow;
-                    endX = hitX + distDiffEnd * BASE_SCROLL_FACTOR * effScrollX * scrollMultiplier;
-                    endY = centerY + distDiffEnd * BASE_SCROLL_FACTOR * effScrollY * scrollMultiplier;
-                }
-            } else {
-                let currentBpmScroll = note.bpm * note.scroll; 
-                let currentBpmScrollY = note.bpm * (note.scrollY || 0) * scrollYDirection;
-                if (isFixedBpmEnabled || isWaveformEnabled) { 
-                    currentBpmScroll = fixedBpmValue; 
-                    currentBpmScrollY = (note.bpm !== 0) ? (note.scrollY || 0) * scrollYDirection * (fixedBpmValue / note.bpm) : 0; 
-                }
-                ppsX = BASE_SCROLL_FACTOR * currentBpmScroll * scrollMultiplier; 
-                ppsY = BASE_SCROLL_FACTOR * currentBpmScrollY * scrollMultiplier;
-                const timeDiff = note.time - t; 
-                x = hitX + timeDiff * ppsX; y = centerY + timeDiff * ppsY;
-                
-                if (note.endTime !== undefined) {
-                    const endTimeDiff = note.endTime - t; endX = hitX + endTimeDiff * ppsX; endY = centerY + endTimeDiff * ppsY;
-                }
-            }
-            sharedNotePos.x = x; sharedNotePos.y = y; sharedNotePos.endX = endX; sharedNotePos.endY = endY; sharedNotePos.ppsX = ppsX; sharedNotePos.ppsY = ppsY;
-            return sharedNotePos;
-        }
-
         const BIN_SIZE = 1.0; 
         function calcNoteVisibleTimeRange(chart, note, canvasWidth, margin) {
-            let tMin = note.time - 5.0; let tMax = (note.endTime || note.time) + 5.0;
+            let tMin = note.time; let tMax = note.endTime || note.time;
             let isBM = chart.isBMScroll; let isHB = chart.isHBScroll;
             if (isHB && isBM) isBM = false; 
 
@@ -830,28 +768,66 @@ BALLOON:10
 
             if (pps_dist !== 0) {
                 let h = canvas.clientHeight || 1080;
-                let visibleDistRange = (Math.max(canvasWidth, h) + margin * 2) / pps_dist;
-                let timePadding = visibleDistRange * 1.5; 
-                timePadding = Math.max(5.0, Math.min(60.0, timePadding)) + 15.0; 
-                tMin = note.time - timePadding; tMax = (note.endTime || note.time) + timePadding;
+                let visibleTime = (Math.max(canvasWidth, h) + margin * 2) / pps_dist;
+                let timePadding = visibleTime * 1.5; 
+                // 極端なBPM・SCROLL値によるメモリ溢れ防止
+                timePadding = Math.max(0.2, Math.min(10.0, timePadding)); 
+                tMin -= timePadding; 
+                tMax += timePadding;
             } else { return [-Infinity, Infinity]; }
             
-            if (note.sudden && (note.sudden.n > 0 || note.sudden.m > 0)) { tMin = Math.max(tMin, note.time - note.sudden.n - 0.5); }
-            return [tMin - 10.0, tMax + 10.0]; 
+            if (note.sudden && (note.sudden.n > 0 || note.sudden.m > 0)) { 
+                tMin = Math.max(tMin, note.time - note.sudden.n - 0.5); 
+            }
+            return [tMin, tMax]; 
         }
 
         function rebuildRenderBins(chart, canvasWidth) {
             if (!chart) return;
             const margin = 100;
-            chart.renderBins = new Map(); 
+            
+            // GCを抑えるためのオブジェクトプール化
+            if (!chart.renderBins) chart.renderBins = new Map();
+            for (let bin of chart.renderBins.values()) {
+                bin.regular.length = 0;
+                bin.barlines.length = 0;
+            }
+            
             chart._binConfig = { canvasWidth, scrollMultiplier, isFixedBpmEnabled, fixedBpmValue, isWaveformEnabled, scrollYDirection };
+
+            const bsfScrollMult = BASE_SCROLL_FACTOR * scrollMultiplier;
+            const scrollYDir = scrollYDirection;
+            const fixBpm = fixedBpmValue;
+            const isFix = isFixedBpmEnabled || isWaveformEnabled;
+            const useDist = !isFix && (chart.isBMScroll || chart.isHBScroll);
+            const isHB = chart.isHBScroll;
+
+            function getVisPos(note) {
+                let x = 0, y = 0;
+                if (useDist) {
+                    let effScrollX = isHB ? note.scroll : 1.0;
+                    let effScrollY = (isHB ? (note.scrollY || 0.0) : 0.0) * scrollYDir;
+                    let dist = note.distance !== undefined ? note.distance : 0;
+                    x = dist * bsfScrollMult * effScrollX;
+                    y = dist * bsfScrollMult * effScrollY;
+                } else {
+                    let cbScroll = note.bpm * note.scroll;
+                    let cbScrollY = note.bpm * (note.scrollY || 0) * scrollYDir;
+                    if (isFix) {
+                        cbScroll = fixBpm;
+                        cbScrollY = (note.bpm !== 0) ? (note.scrollY || 0) * scrollYDir * (fixBpm / note.bpm) : 0;
+                    }
+                    x = note.time * bsfScrollMult * cbScroll;
+                    y = note.time * bsfScrollMult * cbScrollY;
+                }
+                return { x, y };
+            }
 
             function addToBin(note, isBarline) {
                 let [tMin, tMax] = calcNoteVisibleTimeRange(chart, note, canvasWidth, margin);
                 if (tMin > tMax) return;
                 if (tMin === -Infinity) tMin = -10000;
                 if (tMax === Infinity) tMax = 10000;
-                if (tMax - tMin > 600) { tMin = note.time - 300; tMax = note.time + 300; }
                 let startBin = Math.floor(tMin / BIN_SIZE);
                 let endBin = Math.floor(tMax / BIN_SIZE);
                 for (let b = startBin; b <= endBin; b++) {
@@ -862,16 +838,15 @@ BALLOON:10
                 }
             }
 
-            let lastBarlineDist = -100000;
-            let lastBarlineScrollX = null;
-            let lastBarlineScrollY = null;
+            let lastBarline = { vis: { x: -100000, y: -100000 }, scroll: null, scrollY: null, bpm: null };
             for (let note of chart.barlineArr) { 
                 if (!note.barlineVisible) continue; 
                 if (note.distance !== undefined) {
-                    if (Math.abs(note.distance - lastBarlineDist) < 0.1 && note.scroll === lastBarlineScrollX && note.scrollY === lastBarlineScrollY) continue; 
-                    lastBarlineDist = note.distance;
-                    lastBarlineScrollX = note.scroll;
-                    lastBarlineScrollY = note.scrollY;
+                    let vis = getVisPos(note);
+                    if (Math.abs(vis.x - lastBarline.vis.x) < 0.5 && Math.abs(vis.y - lastBarline.vis.y) < 0.5 && note.scroll === lastBarline.scroll && note.scrollY === lastBarline.scrollY && note.bpm === lastBarline.bpm) {
+                        continue; 
+                    }
+                    lastBarline = { vis: vis, scroll: note.scroll, scrollY: note.scrollY, bpm: note.bpm };
                 }
                 addToBin(note, true); 
             }
@@ -881,17 +856,18 @@ BALLOON:10
                 if (note.type === '0') continue;
                 
                 if ((note.type >= '1' && note.type <= '4' || note.type === '7') && note.distance !== undefined) {
+                    let vis = getVisPos(note);
                     const last = lastAdopted[note.type];
                     if (last &&
-                        Math.abs(note.distance - last.distance) < 0.1 &&
-                        Math.abs(note.time - last.time) < 0.1 &&
+                        Math.abs(vis.x - last.vis.x) < 0.5 &&
+                        Math.abs(vis.y - last.vis.y) < 0.5 &&
                         note.scroll === last.scroll &&
                         note.scrollY === last.scrollY &&
                         note.bpm === last.bpm &&
                         (note.type !== '7' || note.hits === last.hits)) {
                         continue; 
                     }
-                    lastAdopted[note.type] = note;
+                    lastAdopted[note.type] = { vis: vis, scroll: note.scroll, scrollY: note.scrollY, bpm: note.bpm, hits: note.hits };
                 }
                 addToBin(note, false); 
             }
@@ -1192,7 +1168,6 @@ BALLOON:10
                 if (note.type === '7' && note.hits === 0 && elapsedTime >= note.time) { note.judgeResult = 'hit'; continue; }
                 const diff = note.time - elapsedTime; if (diff < -JUDGE_BAD) { note.judgeResult = 'miss'; currentCombo = 0; lastPlayedComboThreshold = 0; comboChanged = true; }
             }
-            
             if (comboChanged) updateComboDisplay();
         }
 
@@ -1204,247 +1179,184 @@ BALLOON:10
             
             if (currentChart.measureEndTime > 0 && currentElapsedTime > Math.max(currentChart.measureEndTime, currentChart.endTime) + 1.0) { 
                 const targetTime = currentChart.allMeasureTimes.length > 0 ? currentChart.allMeasureTimes[currentChart.allMeasureTimes.length - 1] : 0;
-                stopSimulation(); 
-                setChartTime(targetTime);
-                return; 
+                stopSimulation(); setChartTime(targetTime); return; 
             }
             if (stopAtTime !== null && currentElapsedTime >= stopAtTime) { stopSimulation(); currentElapsedTime = stopAtTime; updatePreview(currentElapsedTime); return; }
             updateChartState(currentElapsedTime);
             if (chartCoolDownUntil === null) { if (isAutoPlay) autoHitCheck(currentElapsedTime); else playerMissCheck(currentElapsedTime); }
         }
         
-        function drawLoop() {
-            if (!isPlaying) return; animationFrameId = requestAnimationFrame(drawLoop);
-            applyPendingHitEffects();
-            ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight); drawWaveform(currentElapsedTime);
-            const baseCenterY = canvas.clientHeight / 2; const canvasWidth = canvas.clientWidth, canvasHeight = canvas.clientHeight; const canvasMargin = 100; let activeRollNote = null;
-            const chart = currentChart; if (!chart) return;
+        // --- 高速統合描画フレーム ---
+        function renderFrame(time, isPlayingMode) {
+            if (!currentChart && !isPlayingMode) { 
+                ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight); 
+                seekChartState(0); 
+                return; 
+            }
+            if (!currentChart) return;
 
+            if (!isPlayingMode) {
+                resizeCanvas();
+                seekChartState(time);
+            }
+            
+            const elapsedTime = time;
+            const canvasWidth = canvas.clientWidth, canvasHeight = canvas.clientHeight;
+            const baseCenterY = canvasHeight / 2;
+            const canvasMargin = 100;
+            
+            ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+            drawWaveform(elapsedTime);
+            
+            let activeRollNote = null;
+            const chart = currentChart;
+            
             let binConfig = chart._binConfig;
             if (!chart.renderBins || !binConfig || binConfig.canvasWidth !== canvasWidth || binConfig.scrollMultiplier !== scrollMultiplier || binConfig.isFixedBpmEnabled !== isFixedBpmEnabled || binConfig.fixedBpmValue !== fixedBpmValue || binConfig.isWaveformEnabled !== isWaveformEnabled || binConfig.scrollYDirection !== scrollYDirection) {
                 rebuildRenderBins(chart, canvasWidth);
             }
 
             initCullBuffer(canvasWidth, canvasMargin);
-            const cullOffsetPx = canvasMargin * 4; 
             const cullLimit = cullBufferObj.size;
-            const drawn1 = cullBufferObj.drawn1, drawn2 = cullBufferObj.drawn2, drawn3 = cullBufferObj.drawn3, drawn4 = cullBufferObj.drawn4, drawn7 = cullBufferObj.drawn7, drawnBar = cullBufferObj.drawnBar, drawnGrid = cullBufferObj.drawnGrid;
+            const cullOffsetPx = canvasMargin * 4;
+            const cullBuffer = cullBufferObj.buffer;
 
-            const distNow = getDistanceAtTime(chart, currentElapsedTime);
-            const binIndex = Math.floor(currentElapsedTime / BIN_SIZE);
-            const bin = chart.renderBins.get(binIndex) || { regular: [], barlines: [] };
-            
-            const barlines = bin.barlines;
-            renderBuffer.barlinesCount = 0;
-            for (let i = 0; i < barlines.length; i++) {
-                const note = barlines[i];
-                if (note === chart.barlineArr[chart.barlineArr.length - 1]) continue;
-                const pos = calcNotePos(chart, note, currentElapsedTime, HIT_POSITION_X, baseCenterY, distNow);
-                if (pos.hidden || (pos.ppsX === 0 && pos.ppsY === 0)) continue;
-                if (pos.x < -canvasMargin || pos.x > canvasWidth + canvasMargin || pos.y < -canvasMargin || pos.y > canvasHeight + canvasMargin) continue;
-                
-                const px = Math.floor(pos.x * 4) + cullOffsetPx;
-                const py = Math.floor(pos.y * 4);
-                if (px >= 0 && px < cullLimit) { if (drawnBar[px] === py) continue; drawnBar[px] = py; }
-
-                if (renderBuffer.barlinesCount >= renderBuffer.barlines.length) { renderBuffer.barlines.push({ note: null, x: 0, y: 0, ppsX: 0, ppsY: 0 }); }
-                const item = renderBuffer.barlines[renderBuffer.barlinesCount++];
-                item.note = note; item.x = pos.x; item.y = pos.y; item.ppsX = pos.ppsX; item.ppsY = pos.ppsY;
-            }
-
-            for (let i = renderBuffer.barlinesCount - 1; i >= 0; i--) {
-                const item = renderBuffer.barlines[i];
-                const angle = Math.atan2(item.ppsY, item.ppsX), normalAngle = angle + Math.PI / 2; const dx = Math.cos(normalAngle) * (canvasHeight / 2), dy = Math.sin(normalAngle) * (canvasHeight / 2);
-                ctx.beginPath(); ctx.moveTo(item.x - dx, item.y - dy); ctx.lineTo(item.x + dx, item.y + dy); ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)'; ctx.lineWidth = 2; ctx.stroke();
-            }
-
-            const regular = bin.regular;
-            
-            if (showGridLines) {
-                renderBuffer.gridsCount = 0;
-                for (let i = 0; i < regular.length; i++) {
-                    const note = regular[i];
-                    const pos = calcNotePos(chart, note, currentElapsedTime, HIT_POSITION_X, baseCenterY, distNow);
-                    if (pos.hidden || pos.x < -canvasMargin || pos.x > canvasWidth + canvasMargin) continue;
-                    
-                    const px = Math.floor(pos.x * 4) + cullOffsetPx;
-                    const py = Math.floor(pos.y * 4);
-                    if (px >= 0 && px < cullLimit) { if (drawnGrid[px] === py) continue; drawnGrid[px] = py; }
-
-                    if (renderBuffer.gridsCount >= renderBuffer.grids.length) { renderBuffer.grids.push({ note: null, x: 0, y: 0 }); }
-                    const item = renderBuffer.grids[renderBuffer.gridsCount++];
-                    item.note = note; item.x = pos.x; item.y = pos.y;
-                }
-                for (let i = renderBuffer.gridsCount - 1; i >= 0; i--) {
-                    const item = renderBuffer.grids[i];
-                    ctx.beginPath(); ctx.moveTo(item.x, baseCenterY - 40); ctx.lineTo(item.x, baseCenterY + 40);
-                    if (item.note.lineIndex === highlightNoteLine && item.note.colIndex === highlightNoteCol) { ctx.strokeStyle = '#00BFFF'; ctx.lineWidth = 3; } else { ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)'; ctx.lineWidth = 1; }
-                    ctx.stroke();
-                }
-            }
-
-            renderBuffer.regularCount = 0;
-            for (let i = 0; i < regular.length; i++) {
-                const note = regular[i]; if (note.type === '0') continue;
-                if (chartCoolDownUntil !== null && note.time < chartCoolDownUntil) { if (note.type >= '5' && note.type <= '7' && note.endTime > currentElapsedTime) {  } else { continue; } }
-                
-                const pos = calcNotePos(chart, note, currentElapsedTime, HIT_POSITION_X, baseCenterY, distNow);
-                if (pos.hidden) continue;
-                const x = pos.x, y = pos.y, endX = pos.endX, endY = pos.endY, ppsX = pos.ppsX, ppsY = pos.ppsY;
-
-                let skip = false;
-                if (note.type >= '1' && note.type <= '4') {
-                    if (note.judgeResult === 'hit' || (x < -canvasMargin || x > canvasWidth + canvasMargin || y < -canvasMargin || y > canvasHeight + canvasMargin)) skip = true;
-                } else if (note.type === '5' || note.type === '6') {
-                    if ((x < -canvasMargin && endX < -canvasMargin) || (x > canvasWidth + canvasMargin && endX > canvasWidth + canvasMargin) || (y < -canvasMargin && endY < -canvasMargin) || (y > canvasHeight + canvasMargin && endY > canvasHeight + canvasMargin)) skip = true;
-                } else if (note.type === '7') {
-                    if (note.judgeResult === 'hit' || note.judgeResult === 'miss' || (x < -canvasMargin || x > canvasWidth + canvasMargin || y < -canvasMargin || y > canvasHeight + canvasMargin)) skip = true;
-                }
-
-                if (!skip && (note.type >= '1' && note.type <= '4' || note.type === '7')) {
-                    const px = Math.floor(x * 4) + cullOffsetPx;
-                    const py = Math.floor(y * 4);
-                    if (px >= 0 && px < cullLimit) {
-                        if (note.type === '1') { if (drawn1[px] === py) skip = true; else drawn1[px] = py; }
-                        else if (note.type === '2') { if (drawn2[px] === py) skip = true; else drawn2[px] = py; }
-                        else if (note.type === '3') { if (drawn3[px] === py) skip = true; else drawn3[px] = py; }
-                        else if (note.type === '4') { if (drawn4[px] === py) skip = true; else drawn4[px] = py; }
-                        else if (note.type === '7') {
-                            let angle = 0; if (ppsX !== 0 || ppsY !== 0) angle = Math.atan2(ppsY, ppsX);
-                            let angleDeg = Math.floor((angle + Math.PI) * 180 / Math.PI);
-                            let safePy = py + 10000;
-                            let packedVal = safePy * 1000 + angleDeg;
-                            if (drawn7[px] === packedVal) skip = true; else drawn7[px] = packedVal;
-                        }
-                    }
-                }
-
-                if (skip) continue;
-                if (renderBuffer.regularCount >= renderBuffer.regular.length) { renderBuffer.regular.push({ note: null, x: 0, y: 0, endX: 0, endY: 0, ppsX: 0, ppsY: 0 }); }
-                const item = renderBuffer.regular[renderBuffer.regularCount++];
-                item.note = note; item.x = x; item.y = y; item.endX = endX; item.endY = endY; item.ppsX = ppsX; item.ppsY = ppsY;
-            }
-
-            for (let i = renderBuffer.regularCount - 1; i >= 0; i--) {
-                const item = renderBuffer.regular[i];
-                const { note, x, y, endX, endY, ppsX, ppsY } = item;
-
-                if (note.type >= '1' && note.type <= '4') {
-                    const size = NOTE_SIZE[note.type], color = NOTE_COLORS[note.type];
-                    ctx.beginPath(); ctx.arc(x, y, size, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill(); drawNoteStroke(note.type, x, y);
-                } else if (note.type === '5' || note.type === '6') {
-                    if (currentElapsedTime >= note.time && currentElapsedTime <= note.endTime) activeRollNote = note;
-                    const size = NOTE_SIZE[note.type], color = NOTE_COLORS[note.type];
-                    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(endX, endY); ctx.strokeStyle = color; ctx.lineWidth = size * 2; ctx.stroke();
-                    ctx.beginPath(); ctx.arc(endX, endY, size, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill();
-                    ctx.beginPath(); ctx.arc(x, y, size, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill(); drawNoteStroke(note.type, x, y);
-                } else if (note.type === '7') {
-                    let displayX = x, displayY = y, stayAtHitPos = false;
-                    if (note.judgeResult === 'pending') {
-                        if (currentElapsedTime <= note.endTime) {
-                            if (ppsX > 0) { if (x <= HIT_POSITION_X && endX > HIT_POSITION_X) stayAtHitPos = true; }
-                            else if (ppsX < 0) { if (x >= HIT_POSITION_X && endX < HIT_POSITION_X) stayAtHitPos = true; }
-                            else if (ppsY !== 0) { if (ppsY > 0) { if (y <= baseCenterY && endY > baseCenterY) stayAtHitPos = true; } else { if (y >= baseCenterY && endY < baseCenterY) stayAtHitPos = true; } }
-                            if (stayAtHitPos) { displayX = HIT_POSITION_X; if (ppsX !== 0) displayY = y + (HIT_POSITION_X - x) * (ppsY / ppsX); else displayY = baseCenterY; }
-                            activeRollNote = note;
-                        } else { displayX = endX; displayY = endY; }
-                    }
-                    if (displayX > canvasWidth + canvasMargin || displayX < -canvasMargin || displayY > canvasHeight + canvasMargin || displayY < -canvasMargin) continue;
-                    const size = NOTE_SIZE[note.type], color = NOTE_COLORS[note.type];
-                    
-                    let angle = 0; if (ppsX !== 0 || ppsY !== 0) angle = Math.atan2(ppsY, ppsX);
-                    ctx.save(); ctx.translate(displayX, displayY); ctx.rotate(angle);
-                    ctx.fillStyle = color; ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 2; ctx.lineJoin = 'round';
-                    ctx.beginPath(); ctx.moveTo(22, -4); ctx.bezierCurveTo(28, -2, 35, -15, 48, -15); ctx.arc(48, 0, 15, -Math.PI/2, Math.PI/2); ctx.bezierCurveTo(35, 15, 28, 2, 22, 4); ctx.closePath(); ctx.fill(); ctx.stroke();
-                    ctx.beginPath(); ctx.rect(15, -5.5, 7, 11); ctx.fill(); ctx.stroke();
-                    ctx.restore();
-
-                    ctx.beginPath(); ctx.arc(displayX, displayY, size, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill(); drawNoteStroke(note.type, displayX, displayY);
-                    const remainingHits = Math.max(0, note.hits - note.currentHits);
-                    ctx.fillStyle = 'white'; ctx.font = 'bold 13px Inter'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                    if (note.hits > 0 && note.judgeResult === 'pending') ctx.fillText(remainingHits.toString(), displayX, displayY);
-                }
-            }
-            
-            if (activeRollNote && activeRollNote.type !== '7') { rollCountDisplay.textContent = activeRollNote.currentHits; rollCountDisplay.style.opacity = 1; if (activeRollNote.type === '6') rollCountDisplay.style.color = NOTE_COLORS['6']; else rollCountDisplay.style.color = NOTE_COLORS['5']; } else { rollCountDisplay.style.opacity = 0; }
-            currentMeasureIndex = findMeasureIndex(currentElapsedTime); updateMeasureDisplay();
-        }
-
-        function updatePreview(time = currentElapsedTime) { 
-            if (!currentChart) { ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight); seekChartState(0); return; } 
-            resizeCanvas(); seekChartState(time); const elapsedTime = time, baseCenterY = canvas.clientHeight / 2; const canvasWidth = canvas.clientWidth, canvasHeight = canvas.clientHeight; const canvasMargin = 100; 
-            ctx.clearRect(0, 0, canvasWidth, canvasHeight); drawWaveform(elapsedTime);
-
-            let binConfig = currentChart._binConfig;
-            if (!currentChart.renderBins || !binConfig || binConfig.canvasWidth !== canvasWidth || binConfig.scrollMultiplier !== scrollMultiplier || binConfig.isFixedBpmEnabled !== isFixedBpmEnabled || binConfig.fixedBpmValue !== fixedBpmValue || binConfig.isWaveformEnabled !== isWaveformEnabled || binConfig.scrollYDirection !== scrollYDirection) {
-                rebuildRenderBins(currentChart, canvasWidth);
-            }
-
-            initCullBuffer(canvasWidth, canvasMargin);
-            const cullOffsetPx = canvasMargin * 4; 
-            const cullLimit = cullBufferObj.size;
-            const drawn1 = cullBufferObj.drawn1, drawn2 = cullBufferObj.drawn2, drawn3 = cullBufferObj.drawn3, drawn4 = cullBufferObj.drawn4, drawn7 = cullBufferObj.drawn7, drawnBar = cullBufferObj.drawnBar, drawnGrid = cullBufferObj.drawnGrid;
-
-            const distNow = getDistanceAtTime(currentChart, elapsedTime);
+            const distNow = getDistanceAtTime(chart, elapsedTime);
             const binIndex = Math.floor(elapsedTime / BIN_SIZE);
-            const bin = currentChart.renderBins.get(binIndex) || { regular: [], barlines: [] };
+            const bin = chart.renderBins.get(binIndex) || { regular: [], barlines: [] };
 
-            const barlines = bin.barlines;
+            const bsfScrollMult = BASE_SCROLL_FACTOR * scrollMultiplier;
+            const scrollYDir = scrollYDirection;
+            const fixBpm = fixedBpmValue;
+            const isFix = isFixedBpmEnabled || isWaveformEnabled;
+            const useDist = !isFix && (chart.isBMScroll || chart.isHBScroll);
+            const isHB = chart.isHBScroll;
+
+            // --- 座標計算インラインマクロ ---
+            const outPos = { x: 0, y: 0, endX: 0, endY: 0, ppsX: 0, ppsY: 0, hidden: false };
+            function calcPosInline(note) {
+                outPos.hidden = false;
+                let t = elapsedTime;
+                let localDistNow = distNow;
+                if (note.sudden && (note.sudden.n > 0 || note.sudden.m > 0)) {
+                    const timeDiff = note.time - t;
+                    if (timeDiff > note.sudden.n) { outPos.hidden = true; return; }
+                    if (timeDiff > note.sudden.m) {
+                        t = note.time - note.sudden.m;
+                        localDistNow = getDistanceAtTime(chart, t);
+                    }
+                }
+                if (useDist) {
+                    let effScrollX = isHB ? note.scroll : 1.0;
+                    let effScrollY = (isHB ? (note.scrollY || 0.0) : 0.0) * scrollYDir;
+                    let distNote = (note.distance !== undefined) ? note.distance : getDistanceAtTime(chart, note.time);
+                    let distDiff = distNote - localDistNow;
+                    outPos.x = HIT_POSITION_X + distDiff * bsfScrollMult * effScrollX;
+                    outPos.y = baseCenterY + distDiff * bsfScrollMult * effScrollY;
+                    outPos.ppsX = bsfScrollMult * note.bpm * effScrollX;
+                    outPos.ppsY = bsfScrollMult * note.bpm * effScrollY;
+                    if (note.endTime !== undefined) {
+                        let distEnd = (note.endDistance !== undefined) ? note.endDistance : getDistanceAtTime(chart, note.endTime);
+                        let distDiffEnd = distEnd - localDistNow;
+                        outPos.endX = HIT_POSITION_X + distDiffEnd * bsfScrollMult * effScrollX;
+                        outPos.endY = baseCenterY + distDiffEnd * bsfScrollMult * effScrollY;
+                    }
+                } else {
+                    let cbScroll = note.bpm * note.scroll;
+                    let cbScrollY = note.bpm * (note.scrollY || 0) * scrollYDir;
+                    if (isFix) {
+                        cbScroll = fixBpm;
+                        cbScrollY = (note.bpm !== 0) ? (note.scrollY || 0) * scrollYDir * (fixBpm / note.bpm) : 0;
+                    }
+                    outPos.ppsX = bsfScrollMult * cbScroll;
+                    outPos.ppsY = bsfScrollMult * cbScrollY;
+                    const timeDiff = note.time - t;
+                    outPos.x = HIT_POSITION_X + timeDiff * outPos.ppsX;
+                    outPos.y = baseCenterY + timeDiff * outPos.ppsY;
+                    if (note.endTime !== undefined) {
+                        const endTimeDiff = note.endTime - t;
+                        outPos.endX = HIT_POSITION_X + endTimeDiff * outPos.ppsX;
+                        outPos.endY = baseCenterY + endTimeDiff * outPos.ppsY;
+                    }
+                }
+            }
+
+            // --- Barline ---
             renderBuffer.barlinesCount = 0;
+            const barlines = bin.barlines;
+            const lastBarline = chart.barlineArr.length > 0 ? chart.barlineArr[chart.barlineArr.length - 1] : null;
             for (let i = 0; i < barlines.length; i++) {
                 const note = barlines[i];
-                if (note === currentChart.barlineArr[currentChart.barlineArr.length - 1]) continue;
-                const pos = calcNotePos(currentChart, note, elapsedTime, HIT_POSITION_X, baseCenterY, distNow);
-                if (pos.hidden || (pos.ppsX === 0 && pos.ppsY === 0)) continue;
-                if (pos.x < -canvasMargin || pos.x > canvasWidth + canvasMargin || pos.y < -canvasMargin || pos.y > canvasHeight + canvasMargin) continue;
+                if (note === lastBarline) continue;
+                calcPosInline(note);
+                if (outPos.hidden || (outPos.ppsX === 0 && outPos.ppsY === 0)) continue;
+                if (outPos.x < -canvasMargin || outPos.x > canvasWidth + canvasMargin || outPos.y < -canvasMargin || outPos.y > canvasHeight + canvasMargin) continue;
                 
-                const px = Math.floor(pos.x * 4) + cullOffsetPx;
-                const py = Math.floor(pos.y * 4);
-                if (px >= 0 && px < cullLimit) { if (drawnBar[px] === py) continue; drawnBar[px] = py; }
+                const px = Math.floor(outPos.x * 4) + cullOffsetPx;
+                const py = Math.floor(outPos.y * 4);
+                const idx = px * 7 + 5; // Barline
+                if (idx >= 0 && idx < cullLimit) {
+                    if (cullBuffer[idx] === py) continue;
+                    cullBuffer[idx] = py;
+                }
 
                 if (renderBuffer.barlinesCount >= renderBuffer.barlines.length) { renderBuffer.barlines.push({ note: null, x: 0, y: 0, ppsX: 0, ppsY: 0 }); }
                 const item = renderBuffer.barlines[renderBuffer.barlinesCount++];
-                item.note = note; item.x = pos.x; item.y = pos.y; item.ppsX = pos.ppsX; item.ppsY = pos.ppsY;
+                item.note = note; item.x = outPos.x; item.y = outPos.y; item.ppsX = outPos.ppsX; item.ppsY = outPos.ppsY;
             }
 
             for (let i = renderBuffer.barlinesCount - 1; i >= 0; i--) {
                 const item = renderBuffer.barlines[i];
-                const angle = Math.atan2(item.ppsY, item.ppsX), normalAngle = angle + Math.PI / 2; const dx = Math.cos(normalAngle) * (canvasHeight / 2), dy = Math.sin(normalAngle) * (canvasHeight / 2);
-                ctx.beginPath(); ctx.moveTo(item.x - dx, item.y - dy); ctx.lineTo(item.x + dx, item.y + dy); ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)'; ctx.lineWidth = 2; ctx.stroke();
+                const angle = Math.atan2(item.ppsY, item.ppsX), normalAngle = angle + Math.PI / 2; 
+                const dx = Math.cos(normalAngle) * baseCenterY, dy = Math.sin(normalAngle) * baseCenterY;
+                ctx.beginPath(); ctx.moveTo(item.x - dx, item.y - dy); ctx.lineTo(item.x + dx, item.y + dy); 
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)'; ctx.lineWidth = 2; ctx.stroke();
             }
 
+            // --- Grid ---
             const regular = bin.regular;
-
             if (showGridLines) {
                 renderBuffer.gridsCount = 0;
                 for (let i = 0; i < regular.length; i++) {
                     const note = regular[i];
-                    const pos = calcNotePos(currentChart, note, elapsedTime, HIT_POSITION_X, baseCenterY, distNow);
-                    if (pos.hidden || pos.x < -canvasMargin || pos.x > canvasWidth + canvasMargin) continue;
+                    calcPosInline(note);
+                    if (outPos.hidden || outPos.x < -canvasMargin || outPos.x > canvasWidth + canvasMargin) continue;
                     
-                    const px = Math.floor(pos.x * 4) + cullOffsetPx;
-                    const py = Math.floor(pos.y * 4);
-                    if (px >= 0 && px < cullLimit) { if (drawnGrid[px] === py) continue; drawnGrid[px] = py; }
+                    const px = Math.floor(outPos.x * 4) + cullOffsetPx;
+                    const py = Math.floor(outPos.y * 4);
+                    const idx = px * 7 + 6; // Grid
+                    if (idx >= 0 && idx < cullLimit) {
+                        if (cullBuffer[idx] === py) continue;
+                        cullBuffer[idx] = py;
+                    }
 
                     if (renderBuffer.gridsCount >= renderBuffer.grids.length) { renderBuffer.grids.push({ note: null, x: 0, y: 0 }); }
                     const item = renderBuffer.grids[renderBuffer.gridsCount++];
-                    item.note = note; item.x = pos.x; item.y = pos.y;
+                    item.note = note; item.x = outPos.x; item.y = outPos.y;
                 }
                 for (let i = renderBuffer.gridsCount - 1; i >= 0; i--) {
                     const item = renderBuffer.grids[i];
                     ctx.beginPath(); ctx.moveTo(item.x, baseCenterY - 40); ctx.lineTo(item.x, baseCenterY + 40);
-                    if (item.note.lineIndex === highlightNoteLine && item.note.colIndex === highlightNoteCol) { ctx.strokeStyle = '#00BFFF'; ctx.lineWidth = 3; } else { ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)'; ctx.lineWidth = 1; }
+                    if (item.note.lineIndex === highlightNoteLine && item.note.colIndex === highlightNoteCol) { ctx.strokeStyle = '#00BFFF'; ctx.lineWidth = 3; } 
+                    else { ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)'; ctx.lineWidth = 1; }
                     ctx.stroke();
                 }
             }
 
+            // --- Regular Notes ---
             renderBuffer.regularCount = 0;
             for (let i = 0; i < regular.length; i++) {
-                const note = regular[i]; if (note.type === '0') continue;
-                const pos = calcNotePos(currentChart, note, elapsedTime, HIT_POSITION_X, baseCenterY, distNow);
-                if (pos.hidden) continue;
-                const x = pos.x, y = pos.y, endX = pos.endX, endY = pos.endY, ppsX = pos.ppsX, ppsY = pos.ppsY;
+                const note = regular[i]; 
+                if (note.type === '0') continue;
                 
+                if (isPlayingMode && chartCoolDownUntil !== null && note.time < chartCoolDownUntil) { 
+                    if (!(note.type >= '5' && note.type <= '7' && note.endTime > elapsedTime)) continue; 
+                }
+
+                calcPosInline(note);
+                if (outPos.hidden) continue;
+                const x = outPos.x, y = outPos.y, endX = outPos.endX, endY = outPos.endY, ppsX = outPos.ppsX, ppsY = outPos.ppsY;
+
                 let skip = false;
                 if (note.type >= '1' && note.type <= '4') {
                     if (note.judgeResult === 'hit' || (x < -canvasMargin || x > canvasWidth + canvasMargin || y < -canvasMargin || y > canvasHeight + canvasMargin)) skip = true;
@@ -1457,17 +1369,18 @@ BALLOON:10
                 if (!skip && (note.type >= '1' && note.type <= '4' || note.type === '7')) {
                     const px = Math.floor(x * 4) + cullOffsetPx;
                     const py = Math.floor(y * 4);
-                    if (px >= 0 && px < cullLimit) {
-                        if (note.type === '1') { if (drawn1[px] === py) skip = true; else drawn1[px] = py; }
-                        else if (note.type === '2') { if (drawn2[px] === py) skip = true; else drawn2[px] = py; }
-                        else if (note.type === '3') { if (drawn3[px] === py) skip = true; else drawn3[px] = py; }
-                        else if (note.type === '4') { if (drawn4[px] === py) skip = true; else drawn4[px] = py; }
-                        else if (note.type === '7') {
+                    const tMap = { '1': 0, '2': 1, '3': 2, '4': 3, '7': 4 };
+                    const typeId = tMap[note.type];
+                    const idx = px * 7 + typeId;
+
+                    if (idx >= 0 && idx < cullLimit) {
+                        if (note.type === '7') {
                             let angle = 0; if (ppsX !== 0 || ppsY !== 0) angle = Math.atan2(ppsY, ppsX);
                             let angleDeg = Math.floor((angle + Math.PI) * 180 / Math.PI);
-                            let safePy = py + 10000;
-                            let packedVal = safePy * 1000 + angleDeg;
-                            if (drawn7[px] === packedVal) skip = true; else drawn7[px] = packedVal;
+                            let packedVal = (py + 10000) * 1000 + angleDeg;
+                            if (cullBuffer[idx] === packedVal) skip = true; else cullBuffer[idx] = packedVal;
+                        } else {
+                            if (cullBuffer[idx] === py) skip = true; else cullBuffer[idx] = py;
                         }
                     }
                 }
@@ -1483,17 +1396,23 @@ BALLOON:10
                 const { note, x, y, endX, endY, ppsX, ppsY } = item;
                 const size = NOTE_SIZE[note.type] || NOTE_SIZE['1'], color = NOTE_COLORS[note.type] || '#FFFFFF'; 
 
-                if (note.type === '7') { 
-                    let displayX = x, displayY = y, stayAtHitPos = false; 
-                    if (note.judgeResult === 'pending') { 
-                        if (elapsedTime <= note.endTime) { 
-                            if (ppsX > 0) { if (x <= HIT_POSITION_X && endX > HIT_POSITION_X) stayAtHitPos = true; } 
-                            else if (ppsX < 0) { if (x >= HIT_POSITION_X && endX < HIT_POSITION_X) stayAtHitPos = true; } 
-                            else if (ppsY !== 0) { if (ppsY > 0) { if (y <= baseCenterY && endY > baseCenterY) stayAtHitPos = true; } else { if (y >= baseCenterY && endY < baseCenterY) stayAtHitPos = true; } } 
-                            if (stayAtHitPos) { displayX = HIT_POSITION_X; if (ppsX !== 0) displayY = y + (HIT_POSITION_X - x) * (ppsY / ppsX); else displayY = baseCenterY; } 
-                        } else { displayX = endX; displayY = endY; } 
-                    } 
-                    if (displayX > canvasWidth + canvasMargin || displayX < -canvasMargin || displayY > canvasHeight + canvasMargin || displayY < -canvasMargin) continue; 
+                if (note.type === '5' || note.type === '6') {
+                    if (isPlayingMode && elapsedTime >= note.time && elapsedTime <= note.endTime) activeRollNote = note;
+                    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(endX, endY); ctx.strokeStyle = color; ctx.lineWidth = size * 2; ctx.stroke();
+                    ctx.beginPath(); ctx.arc(endX, endY, size, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill();
+                    ctx.beginPath(); ctx.arc(x, y, size, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill(); drawNoteStroke(note.type, x, y);
+                } else if (note.type === '7') {
+                    let displayX = x, displayY = y, stayAtHitPos = false;
+                    if (note.judgeResult === 'pending') {
+                        if (elapsedTime <= note.endTime) {
+                            if (ppsX > 0) { if (x <= HIT_POSITION_X && endX > HIT_POSITION_X) stayAtHitPos = true; }
+                            else if (ppsX < 0) { if (x >= HIT_POSITION_X && endX < HIT_POSITION_X) stayAtHitPos = true; }
+                            else if (ppsY !== 0) { if (ppsY > 0) { if (y <= baseCenterY && endY > baseCenterY) stayAtHitPos = true; } else { if (y >= baseCenterY && endY < baseCenterY) stayAtHitPos = true; } }
+                            if (stayAtHitPos) { displayX = HIT_POSITION_X; if (ppsX !== 0) displayY = y + (HIT_POSITION_X - x) * (ppsY / ppsX); else displayY = baseCenterY; }
+                            if (isPlayingMode) activeRollNote = note;
+                        } else { displayX = endX; displayY = endY; }
+                    }
+                    if (displayX > canvasWidth + canvasMargin || displayX < -canvasMargin || displayY > canvasHeight + canvasMargin || displayY < -canvasMargin) continue;
                     
                     let angle = 0; if (ppsX !== 0 || ppsY !== 0) angle = Math.atan2(ppsY, ppsX);
                     ctx.save(); ctx.translate(displayX, displayY); ctx.rotate(angle);
@@ -1502,17 +1421,43 @@ BALLOON:10
                     ctx.beginPath(); ctx.rect(15, -5.5, 7, 11); ctx.fill(); ctx.stroke();
                     ctx.restore();
 
-                    ctx.beginPath(); ctx.arc(displayX, displayY, size, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill(); drawNoteStroke(note.type, displayX, displayY); 
-                    ctx.fillStyle = 'white'; ctx.font = 'bold 13px Inter'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; if (note.hits > 0) ctx.fillText(note.hits.toString(), displayX, displayY); 
-                } else if (note.type === '5' || note.type === '6') { 
-                    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(endX, endY); ctx.strokeStyle = color; ctx.lineWidth = size * 2; ctx.stroke(); ctx.beginPath(); ctx.arc(endX, endY, size, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill(); ctx.beginPath(); ctx.arc(x, y, size, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill(); drawNoteStroke(note.type, x, y); 
+                    ctx.beginPath(); ctx.arc(displayX, displayY, size, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill(); drawNoteStroke(note.type, displayX, displayY);
+                    
+                    const remainingHits = isPlayingMode ? Math.max(0, note.hits - note.currentHits) : note.hits;
+                    ctx.fillStyle = 'white'; ctx.font = 'bold 13px Inter'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    if (note.hits > 0 && note.judgeResult === 'pending') ctx.fillText(remainingHits.toString(), displayX, displayY);
+                } else {
+                    ctx.beginPath(); ctx.arc(x, y, size, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill(); drawNoteStroke(note.type, x, y);
+                }
+            }
+            
+            if (isPlayingMode) {
+                if (activeRollNote && activeRollNote.type !== '7') { 
+                    rollCountDisplay.textContent = activeRollNote.currentHits; 
+                    rollCountDisplay.style.opacity = 1; 
+                    if (activeRollNote.type === '6') rollCountDisplay.style.color = NOTE_COLORS['6']; 
+                    else rollCountDisplay.style.color = NOTE_COLORS['5']; 
                 } else { 
-                    ctx.beginPath(); ctx.arc(x, y, size, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill(); drawNoteStroke(note.type, x, y); 
-                } 
-            } 
+                    rollCountDisplay.style.opacity = 0; 
+                }
+                currentMeasureIndex = findMeasureIndex(elapsedTime); 
+                updateMeasureDisplay();
+            }
+        }
+
+        function drawLoop() {
+            if (!isPlaying) return; 
+            animationFrameId = requestAnimationFrame(drawLoop);
+            applyPendingHitEffects();
+            renderFrame(currentElapsedTime, true);
+        }
+
+        function updatePreview(time = currentElapsedTime) { 
+            renderFrame(time, false);
         }
 
         function setChartTime(time) { 
+            if (isPreparing) return; // 準備中は処理を行わない
             if (!currentChart) { currentElapsedTime = 0; currentMeasureIndex = 0; currentCombo = 0; updateComboDisplay(); updateMeasureDisplay(); seekChartState(0); updatePreview(0); return; } 
             const wasPlaying = isPlaying; if (wasPlaying) stopSimulation(); 
             currentElapsedTime = time; currentMeasureIndex = findMeasureIndex(time); let initialCombo = 0; 
@@ -1550,102 +1495,113 @@ BALLOON:10
         }
         
         async function startSimulation() {
-            if (isPlaying || !currentChart) return;
-            isPlaying = true;
+            if (isPlaying || isPreparing || !currentChart) return;
+            isPreparing = true;
 
             playButton.textContent = '準備中...'; 
             playButton.className = "px-4 py-2 bg-yellow-500 text-white font-semibold rounded-lg shadow opacity-50 cursor-not-allowed";
             playButton.disabled = true;
             editor.disabled = true;
 
-            await new Promise(resolve => setTimeout(resolve, 50));
+            try {
+                await new Promise(resolve => setTimeout(resolve, 50));
 
-            await initializeAudio(); 
-            if (audioContext && audioContext.state === 'suspended') { await audioContext.resume(); } 
-            
-            const requiredWaveName = allCourses.globalConfig.WAVE; const isFileNameMatch = (requiredWaveName && uploadedMusicFileName && requiredWaveName === uploadedMusicFileName);
-            simulationStartOffset = currentElapsedTime; 
-
-            let autoSeAudioBuffer = null;
-            if (isAutoPlay && audioContext) {
-                const sampleRate = audioContext.sampleRate;
-                let maxTime = currentChart.endTime || 0;
-                if (maxTime === 0 && currentChart.notes.length > 0) { maxTime = currentChart.notes[currentChart.notes.length - 1].time; }
-                let overallMaxTime = maxTime + 2.0; 
+                await initializeAudio(); 
+                if (audioContext && audioContext.state === 'suspended') { await audioContext.resume(); } 
                 
-                const totalSamples = Math.ceil(overallMaxTime * sampleRate);
-                if (totalSamples > 0) {
-                    const outputL = new Float32Array(totalSamples); const outputR = new Float32Array(totalSamples);
+                const requiredWaveName = allCourses.globalConfig.WAVE; const isFileNameMatch = (requiredWaveName && uploadedMusicFileName && requiredWaveName === uploadedMusicFileName);
+                simulationStartOffset = currentElapsedTime; 
+
+                let autoSeAudioBuffer = null;
+                if (isAutoPlay && audioContext) {
+                    const sampleRate = audioContext.sampleRate;
+                    let maxTime = currentChart.endTime || 0;
+                    if (maxTime === 0 && currentChart.notes.length > 0) { maxTime = currentChart.notes[currentChart.notes.length - 1].time; }
+                    let overallMaxTime = maxTime + 2.0; 
                     
-                    const soundChannels = {
-                        don: audioBuffers.don ? { L: audioBuffers.don.getChannelData(0), R: audioBuffers.don.numberOfChannels > 1 ? audioBuffers.don.getChannelData(1) : audioBuffers.don.getChannelData(0) } : null,
-                        ka: audioBuffers.ka ? { L: audioBuffers.ka.getChannelData(0), R: audioBuffers.ka.numberOfChannels > 1 ? audioBuffers.ka.getChannelData(1) : audioBuffers.ka.getChannelData(0) } : null,
-                        balloon: audioBuffers.balloon ? { L: audioBuffers.balloon.getChannelData(0), R: audioBuffers.balloon.numberOfChannels > 1 ? audioBuffers.balloon.getChannelData(1) : audioBuffers.balloon.getChannelData(0) } : null
-                    };
+                    const totalSamples = Math.ceil(overallMaxTime * sampleRate);
+                    if (totalSamples > 0) {
+                        const outputL = new Float32Array(totalSamples); const outputR = new Float32Array(totalSamples);
+                        
+                        const soundChannels = {
+                            don: audioBuffers.don ? { L: audioBuffers.don.getChannelData(0), R: audioBuffers.don.numberOfChannels > 1 ? audioBuffers.don.getChannelData(1) : audioBuffers.don.getChannelData(0) } : null,
+                            ka: audioBuffers.ka ? { L: audioBuffers.ka.getChannelData(0), R: audioBuffers.ka.numberOfChannels > 1 ? audioBuffers.ka.getChannelData(1) : audioBuffers.ka.getChannelData(0) } : null,
+                            balloon: audioBuffers.balloon ? { L: audioBuffers.balloon.getChannelData(0), R: audioBuffers.balloon.numberOfChannels > 1 ? audioBuffers.balloon.getChannelData(1) : audioBuffers.balloon.getChannelData(0) } : null
+                        };
 
-                    const effectiveStartTime = chartCoolDownUntil !== null ? chartCoolDownUntil : simulationStartOffset;
-                    
-                    let seEvents = [];
-                    const effectiveRollSpeed = autoRollSpeed * playbackSpeed;
-                    for (let i = 0; i < currentChart.notes.length; i++) {
-                        const note = currentChart.notes[i];
-                        if (note.type === '1' || note.type === '3') { if (note.time >= effectiveStartTime) seEvents.push({ time: note.time, type: 'don' }); }
-                        else if (note.type === '2' || note.type === '4') { if (note.time >= effectiveStartTime) seEvents.push({ time: note.time, type: 'ka' }); }
-                        else if (note.type === '5' || note.type === '6') { const hitInterval = 1.0 / effectiveRollSpeed; for (let t = note.time; t <= note.endTime; t += hitInterval) { if (t >= effectiveStartTime) seEvents.push({ time: t, type: 'don' }); } }
-                        else if (note.type === '7') { const hitInterval = 1.0 / effectiveRollSpeed; let hits = 0; for (let t = note.time; t <= note.endTime; t += hitInterval) { if (t >= effectiveStartTime) seEvents.push({ time: t, type: 'don' }); hits++; if (hits >= note.hits) { if (t >= effectiveStartTime) seEvents.push({ time: t, type: 'balloon' }); break; } } }
+                        const effectiveStartTime = chartCoolDownUntil !== null ? chartCoolDownUntil : simulationStartOffset;
+                        
+                        let seEvents = [];
+                        const effectiveRollSpeed = autoRollSpeed * playbackSpeed;
+                        for (let i = 0; i < currentChart.notes.length; i++) {
+                            const note = currentChart.notes[i];
+                            if (note.type === '1' || note.type === '3') { if (note.time >= effectiveStartTime) seEvents.push({ time: note.time, type: 'don' }); }
+                            else if (note.type === '2' || note.type === '4') { if (note.time >= effectiveStartTime) seEvents.push({ time: note.time, type: 'ka' }); }
+                            else if (note.type === '5' || note.type === '6') { const hitInterval = 1.0 / effectiveRollSpeed; for (let t = note.time; t <= note.endTime; t += hitInterval) { if (t >= effectiveStartTime) seEvents.push({ time: t, type: 'don' }); } }
+                            else if (note.type === '7') { const hitInterval = 1.0 / effectiveRollSpeed; let hits = 0; for (let t = note.time; t <= note.endTime; t += hitInterval) { if (t >= effectiveStartTime) seEvents.push({ time: t, type: 'don' }); hits++; if (hits >= note.hits) { if (t >= effectiveStartTime) seEvents.push({ time: t, type: 'balloon' }); break; } } }
+                        }
+                        seEvents.sort((a, b) => a.time - b.time);
+
+                        const nextSameBufferIdx = new Int32Array(seEvents.length);
+                        const lastSeen = new Map();
+                        for (let i = seEvents.length - 1; i >= 0; i--) {
+                            const typeStr = seEvents[i].type;
+                            if (lastSeen.has(typeStr)) nextSameBufferIdx[i] = lastSeen.get(typeStr); else nextSameBufferIdx[i] = totalSamples * 2;
+                            lastSeen.set(typeStr, ((seEvents[i].time) * sampleRate + 0.5) | 0);
+                        }
+
+                        for (let i = 0; i < seEvents.length; i++) {
+                            const ev = seEvents[i]; let bufKey = ev.type;
+                            if (!soundChannels[bufKey] && bufKey === 'balloon') bufKey = 'don';
+                            if (!soundChannels[bufKey]) continue;
+
+                            const cL = soundChannels[bufKey].L; const cR = soundChannels[bufKey].R;
+                            const startIdx = (ev.time * sampleRate + 0.5) | 0;
+                            if (startIdx < 0 || startIdx >= totalSamples) continue;
+
+                            const len = cL.length; const maxIdx = nextSameBufferIdx[i];
+                            for (let j = 0, idx = startIdx; j < len && idx < maxIdx && idx < totalSamples; j++, idx++) { outputL[idx] += cL[j]; outputR[idx] += cR[j]; }
+                        }
+
+                        autoSeAudioBuffer = audioContext.createBuffer(2, totalSamples, sampleRate);
+                        autoSeAudioBuffer.getChannelData(0).set(outputL); autoSeAudioBuffer.getChannelData(1).set(outputR);
+
+                        autoSeSourceNode = audioContext.createBufferSource(); autoSeSourceNode.buffer = autoSeAudioBuffer; autoSeSourceNode.playbackRate.value = 1.0; autoSeSourceNode.connect(seGainNode);
                     }
-                    seEvents.sort((a, b) => a.time - b.time);
-
-                    const nextSameBufferIdx = new Int32Array(seEvents.length);
-                    const lastSeen = new Map();
-                    for (let i = seEvents.length - 1; i >= 0; i--) {
-                        const typeStr = seEvents[i].type;
-                        if (lastSeen.has(typeStr)) nextSameBufferIdx[i] = lastSeen.get(typeStr); else nextSameBufferIdx[i] = totalSamples * 2;
-                        lastSeen.set(typeStr, ((seEvents[i].time) * sampleRate + 0.5) | 0);
-                    }
-
-                    for (let i = 0; i < seEvents.length; i++) {
-                        const ev = seEvents[i]; let bufKey = ev.type;
-                        if (!soundChannels[bufKey] && bufKey === 'balloon') bufKey = 'don';
-                        if (!soundChannels[bufKey]) continue;
-
-                        const cL = soundChannels[bufKey].L; const cR = soundChannels[bufKey].R;
-                        const startIdx = (ev.time * sampleRate + 0.5) | 0;
-                        if (startIdx < 0 || startIdx >= totalSamples) continue;
-
-                        const len = cL.length; const maxIdx = nextSameBufferIdx[i];
-                        for (let j = 0, idx = startIdx; j < len && idx < maxIdx && idx < totalSamples; j++, idx++) { outputL[idx] += cL[j]; outputR[idx] += cR[j]; }
-                    }
-
-                    autoSeAudioBuffer = audioContext.createBuffer(2, totalSamples, sampleRate);
-                    autoSeAudioBuffer.getChannelData(0).set(outputL); autoSeAudioBuffer.getChannelData(1).set(outputR);
-
-                    autoSeSourceNode = audioContext.createBufferSource(); autoSeSourceNode.buffer = autoSeAudioBuffer; autoSeSourceNode.playbackRate.value = 1.0; autoSeSourceNode.connect(seGainNode);
                 }
+
+                simulationStartTime = audioContext.currentTime;
+
+                if (musicAudioBuffer && isFileNameMatch) { musicSourceNode = audioContext.createBufferSource(); musicSourceNode.buffer = musicAudioBuffer; musicSourceNode.playbackRate.value = playbackSpeed; musicSourceNode.connect(musicGainNode); }
+                
+                const offset = allCourses.globalConfig.OFFSET || 0; const targetTime = coolDownTime + Math.max(0, offset);
+
+                if (simulationStartOffset < targetTime) { 
+                    let waitTime = targetTime - simulationStartOffset; if (musicSourceNode) musicSourceNode.start(audioContext.currentTime + waitTime, 0); 
+                } else { 
+                    let playedRealTime = simulationStartOffset - targetTime; let audioOffset = playedRealTime * playbackSpeed; if (musicSourceNode) musicSourceNode.start(audioContext.currentTime, audioOffset); 
+                }
+                
+                if (autoSeSourceNode && autoSeAudioBuffer) {
+                    let seOffset = simulationStartOffset;
+                    if (seOffset >= 0 && seOffset < autoSeAudioBuffer.duration) { autoSeSourceNode.start(audioContext.currentTime, seOffset); } else if (seOffset < 0) { autoSeSourceNode.start(audioContext.currentTime + (-seOffset), 0); }
+                }
+
+                playButton.textContent = '停止'; playButton.className = "px-4 py-2 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg shadow transition-colors duration-200";
+                playButton.disabled = false;
+                
+                isPlaying = true;
+                rollCountDisplay.style.opacity = 0; pendingHitEffects.clear(); lastFrameTime = performance.now();
+                logicIntervalId = setInterval(updateLogic, 1000 / renderFPS); animationFrameId = requestAnimationFrame(drawLoop);
+            } catch (e) {
+                console.error("Failed to start simulation:", e);
+                isPlaying = false;
+                playButton.textContent = '再生'; playButton.className = "px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg shadow transition-colors duration-200";
+                playButton.disabled = false;
+                editor.disabled = false;
+            } finally {
+                isPreparing = false;
             }
-
-            simulationStartTime = audioContext.currentTime;
-
-            if (musicAudioBuffer && isFileNameMatch) { musicSourceNode = audioContext.createBufferSource(); musicSourceNode.buffer = musicAudioBuffer; musicSourceNode.playbackRate.value = playbackSpeed; musicSourceNode.connect(musicGainNode); }
-            
-            const offset = allCourses.globalConfig.OFFSET || 0; const targetTime = coolDownTime + Math.max(0, offset);
-
-            if (simulationStartOffset < targetTime) { 
-                let waitTime = targetTime - simulationStartOffset; if (musicSourceNode) musicSourceNode.start(audioContext.currentTime + waitTime, 0); 
-            } else { 
-                let playedRealTime = simulationStartOffset - targetTime; let audioOffset = playedRealTime * playbackSpeed; if (musicSourceNode) musicSourceNode.start(audioContext.currentTime, audioOffset); 
-            }
-            
-            if (autoSeSourceNode && autoSeAudioBuffer) {
-                let seOffset = simulationStartOffset;
-                if (seOffset >= 0 && seOffset < autoSeAudioBuffer.duration) { autoSeSourceNode.start(audioContext.currentTime, seOffset); } else if (seOffset < 0) { autoSeSourceNode.start(audioContext.currentTime + (-seOffset), 0); }
-            }
-
-            playButton.textContent = '停止'; playButton.className = "px-4 py-2 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg shadow transition-colors duration-200";
-            playButton.disabled = false;
-            
-            rollCountDisplay.style.opacity = 0; pendingHitEffects.clear(); lastFrameTime = performance.now();
-            logicIntervalId = setInterval(updateLogic, 1000 / renderFPS); animationFrameId = requestAnimationFrame(drawLoop);
         }
         
         function stopSimulation() { 
@@ -1656,16 +1612,19 @@ BALLOON:10
             
             playButton.textContent = '再生'; playButton.className = "px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg shadow transition-colors duration-200";
             playButton.disabled = false;
-            editor.disabled = false; judgeDisplay.innerHTML = ''; rollCountDisplay.style.opacity = 0; pendingHitEffects.clear(); updatePreview(currentElapsedTime); 
+            editor.disabled = false;
+            judgeDisplay.innerHTML = ''; rollCountDisplay.style.opacity = 0; pendingHitEffects.clear(); updatePreview(currentElapsedTime); 
         }
         
         function findMeasureIndex(time) { if (!currentChart) return 0; const times = currentChart.allMeasureTimes; if (times.length === 0) return 0; let lo = 0, hi = times.length - 1, result = 0; while (lo <= hi) { const mid = (lo + hi) >>> 1; if (times[mid] <= time) { result = mid; lo = mid + 1; } else hi = mid - 1; } return result; }
         function seekToMeasure(direction) { if (isPlaying || !currentChart) return; const newMeasureIndex = Math.max(0, Math.min(currentChart.allMeasureTimes.length - 1, currentMeasureIndex + direction)); setChartTime(currentChart.allMeasureTimes[newMeasureIndex]); }
         function playMeasure() { 
+            if (isPreparing) return; // 準備中は処理を行わない
             if (!isLivePreviewEnabled && !isPlaying) applyEditorChange();
             if (isPlaying) { stopSimulation(); if (currentChart) { const newMeasureIndex = findMeasureIndex(currentElapsedTime); setChartTime(currentChart.allMeasureTimes[newMeasureIndex]); } } else { const newMeasureIndex = findMeasureIndex(currentElapsedTime); const targetTime = currentChart.allMeasureTimes[newMeasureIndex]; setChartTime(targetTime); currentElapsedTime = Math.max(0, targetTime - coolDownTime); chartCoolDownUntil = targetTime; seekChartState(currentElapsedTime); stopAtTime = null; startSimulation(); } 
         }
         function togglePlay() { 
+            if (isPreparing) return; // 準備中は処理を行わない
             tjaEditor.blur(); previewContainer.focus(); 
             if (!isLivePreviewEnabled && !isPlaying) applyEditorChange();
             if (isPlaying) { stopSimulation(); if (currentChart) { const newMeasureIndex = findMeasureIndex(currentElapsedTime); setChartTime(currentChart.allMeasureTimes[newMeasureIndex]); } } else { const targetTime = currentElapsedTime; setChartTime(targetTime); if (targetTime === 0) { chartCoolDownUntil = coolDownTime; currentElapsedTime = 0; } else { currentElapsedTime = Math.max(0, targetTime - coolDownTime); chartCoolDownUntil = targetTime; } seekChartState(currentElapsedTime); stopAtTime = null; startSimulation(); } 
@@ -1741,7 +1700,7 @@ BALLOON:10
             reader.readAsArrayBuffer(file); event.target.value = null;
         });
         
-        function updateCourseSelect() { const keys = Object.keys(allCourses.courses).map(k => parseInt(k, 10)).sort((a, b) => b - a); courseSelect.innerHTML = ''; if (keys.length === 0) { courseSelect.innerHTML = '<option value="3">おに</option>'; courseSelect.value = 3; return; } const keyMap = { 0: 'かんたん', 1: 'ふつう', 2: 'むずかしい', 3: 'おに', 4: 'おに(裏)' }; keys.forEach(key => { const option = document.createElement('option'); option.value = key; option.textContent = keyMap[key] || `Edit ${key}`; courseSelect.appendChild(option); }); if (keys.includes(3)) courseSelect.value = 3; else courseSelect.value = keys[0]; }
+        function updateCourseSelect() { const keys = Object.keys(allCourses.courses).map(k => parseInt(k, 10)).sort((a, b) => b - a); courseSelect.innerHTML = ''; if (keys.length === 0) { courseSelect.innerHTML = '<option value="3">おに</option>'; courseSelect.value = 3; return; } const keyMap = { 0: 'かんたん', 1: 'ふつう', 2: 'むずかしい', 3: 'おに', 4: 'おおに(裏)' }; keys.forEach(key => { const option = document.createElement('option'); option.value = key; option.textContent = keyMap[key] || `Edit ${key}`; courseSelect.appendChild(option); }); if (keys.includes(3)) courseSelect.value = 3; else courseSelect.value = keys[0]; }
         courseSelect.addEventListener('change', () => { const selectedKey = parseInt(courseSelect.value, 10); currentChart = allCourses.courses[selectedKey] || null; setChartTime(0); updateEditorGutter(); updateCursorPosition(); });
         
         async function handleMusicUpload(file) {
@@ -1961,7 +1920,7 @@ BALLOON:10
 
         document.getElementById('exportTjaButton').addEventListener('click', (e) => { e.preventDefault(); exportTJA(); });
         document.getElementById('exportMusicButton').addEventListener('click', (e) => { e.preventDefault(); if (uploadedMusicObjectURL && uploadedMusicFileName) { const a = document.createElement('a'); a.href = uploadedMusicObjectURL; a.download = uploadedMusicFileName; document.body.appendChild(a); a.click(); document.body.removeChild(a); } else { alert('エクスポートする楽曲が読み込まれていません。'); } });
-        settingsButton.addEventListener('click', openSettings); closeSettingsButton.addEventListener('click', closeSettings); saveSettingsButton.addEventListener('click', saveSettings); showHelpButton.addEventListener('click', () => helpModal.style.display = 'flex'); closeHelpButton.addEventListener('click', () => helpModal.style.display = 'none');
+        settingsButton.addEventListener('click', openSettings); closeSettingsButton.addEventListener('click', closeSettings); saveSettingsButton.addEventListener('click', saveSettings); showHelpButton.addEventListener('click', () => helpModal.style.display = 'flex'); closeHelpButton.addEventListener('click', () => helpModal.style.none);
 
         const seInputs = { don: document.getElementById('donSeInput'), ka: document.getElementById('kaSeInput'), balloon: document.getElementById('balloonSeInput') };
         function handleSeImport(file, seKey) { const reader = new FileReader(); reader.onload = e => { const arrayBuffer = e.target.result; if (audioContext) audioContext.decodeAudioData(arrayBuffer.slice(0)).then(decodedData => { if(currentHitSoundSet === 'default') audioBuffers[seKey] = decodedData; }); const reader2 = new FileReader(); reader2.onload = e2 => { localStorage.setItem(`se_${seKey}`, e2.target.result); alert(`${seKey}.ogg をインポートしました。`); }; reader2.readAsDataURL(file); }; reader.readAsArrayBuffer(file); }
