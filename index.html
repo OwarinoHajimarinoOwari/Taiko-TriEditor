@@ -448,7 +448,7 @@ BALLOON:10
         let HIT_POSITION_X = 175;
         const NOTE_COLORS = { '1': '#F44336', '2': '#2196F3', '3': '#F44336', '4': '#2196F3', '5': '#FFC107', '6': '#FFC107', '7': '#f97902' };
         const NOTE_SIZE = { '1': 15, '2': 15, '3': 22.5, '4': 22.5, '5': 15, '6': 22.5, '7': 15 };
-        const JUDGE_PERFECT = 0.025, JUDGE_GOOD = 0.075, JUDGE_BAD = 0.107;
+        const JUDGE_PERFECT = 0.025025, JUDGE_GOOD = 0.075075, JUDGE_BAD = 0.108442;
 
         let state_currentBPM = 120, state_isGogo = false, state_jposStartTime = -Infinity, state_jposDuration = 0, state_jposStartX = HIT_POSITION_X_DEFAULT, state_jposEndX = HIT_POSITION_X_DEFAULT, state_jposEasing = 0;
 
@@ -863,15 +863,41 @@ BALLOON:10
             }
 
             let lastBarlineDist = -100000;
+            let lastBarlineTime = -100000;
             let lastBarlineScrollX = null;
             let lastBarlineScrollY = null;
+            let lastBarlineBpm = null;
             for (let note of chart.barlineArr) { 
                 if (!note.barlineVisible) continue; 
                 if (note.distance !== undefined) {
-                    if (Math.abs(note.distance - lastBarlineDist) < 0.1 && note.scroll === lastBarlineScrollX && note.scrollY === lastBarlineScrollY) continue; 
+                    if (note.scroll === lastBarlineScrollX && note.scrollY === lastBarlineScrollY && note.bpm === lastBarlineBpm) {
+                        let dx = 0, dy = 0;
+                        let isBM = chart.isBMScroll; let isHB = chart.isHBScroll;
+                        if (isHB && isBM) isBM = false; 
+                        if (!isFixedBpmEnabled && !isWaveformEnabled && (isBM || isHB)) {
+                            let effScrollX = isHB ? note.scroll : 1.0; 
+                            let effScrollY = (isHB ? (note.scrollY || 0.0) : 0.0) * scrollYDirection;
+                            dx = Math.abs(note.distance - lastBarlineDist) * BASE_SCROLL_FACTOR * effScrollX * scrollMultiplier;
+                            dy = Math.abs(note.distance - lastBarlineDist) * BASE_SCROLL_FACTOR * effScrollY * scrollMultiplier;
+                        } else {
+                            let currentBpmScroll = note.bpm * note.scroll; 
+                            let currentBpmScrollY = note.bpm * (note.scrollY || 0) * scrollYDirection;
+                            if (isFixedBpmEnabled || isWaveformEnabled) { 
+                                currentBpmScroll = fixedBpmValue; 
+                                currentBpmScrollY = (note.bpm !== 0) ? (note.scrollY || 0) * scrollYDirection * (fixedBpmValue / note.bpm) : 0; 
+                            }
+                            let ppsX = BASE_SCROLL_FACTOR * currentBpmScroll * scrollMultiplier; 
+                            let ppsY = BASE_SCROLL_FACTOR * currentBpmScrollY * scrollMultiplier;
+                            dx = Math.abs(note.time - lastBarlineTime) * ppsX;
+                            dy = Math.abs(note.time - lastBarlineTime) * ppsY;
+                        }
+                        if (Math.abs(dx) < 0.25 && Math.abs(dy) < 0.25) continue;
+                    }
                     lastBarlineDist = note.distance;
+                    lastBarlineTime = note.time;
                     lastBarlineScrollX = note.scroll;
                     lastBarlineScrollY = note.scrollY;
+                    lastBarlineBpm = note.bpm;
                 }
                 addToBin(note, true); 
             }
@@ -883,13 +909,36 @@ BALLOON:10
                 if ((note.type >= '1' && note.type <= '4' || note.type === '7') && note.distance !== undefined) {
                     const last = lastAdopted[note.type];
                     if (last &&
-                        Math.abs(note.distance - last.distance) < 0.1 &&
-                        Math.abs(note.time - last.time) < 0.1 &&
                         note.scroll === last.scroll &&
                         note.scrollY === last.scrollY &&
                         note.bpm === last.bpm &&
                         (note.type !== '7' || note.hits === last.hits)) {
-                        continue; 
+                        
+                        let dx = 0, dy = 0;
+                        let isBM = chart.isBMScroll; let isHB = chart.isHBScroll;
+                        if (isHB && isBM) isBM = false; 
+
+                        if (!isFixedBpmEnabled && !isWaveformEnabled && (isBM || isHB)) {
+                            let effScrollX = isHB ? note.scroll : 1.0; 
+                            let effScrollY = (isHB ? (note.scrollY || 0.0) : 0.0) * scrollYDirection;
+                            dx = Math.abs(note.distance - last.distance) * BASE_SCROLL_FACTOR * effScrollX * scrollMultiplier;
+                            dy = Math.abs(note.distance - last.distance) * BASE_SCROLL_FACTOR * effScrollY * scrollMultiplier;
+                        } else {
+                            let currentBpmScroll = note.bpm * note.scroll; 
+                            let currentBpmScrollY = note.bpm * (note.scrollY || 0) * scrollYDirection;
+                            if (isFixedBpmEnabled || isWaveformEnabled) { 
+                                currentBpmScroll = fixedBpmValue; 
+                                currentBpmScrollY = (note.bpm !== 0) ? (note.scrollY || 0) * scrollYDirection * (fixedBpmValue / note.bpm) : 0; 
+                            }
+                            let ppsX = BASE_SCROLL_FACTOR * currentBpmScroll * scrollMultiplier; 
+                            let ppsY = BASE_SCROLL_FACTOR * currentBpmScrollY * scrollMultiplier;
+                            dx = Math.abs(note.time - last.time) * ppsX;
+                            dy = Math.abs(note.time - last.time) * ppsY;
+                        }
+
+                        if (Math.abs(dx) < 0.25 && Math.abs(dy) < 0.25) {
+                            continue; 
+                        }
                     }
                     lastAdopted[note.type] = note;
                 }
@@ -1662,10 +1711,12 @@ BALLOON:10
         function findMeasureIndex(time) { if (!currentChart) return 0; const times = currentChart.allMeasureTimes; if (times.length === 0) return 0; let lo = 0, hi = times.length - 1, result = 0; while (lo <= hi) { const mid = (lo + hi) >>> 1; if (times[mid] <= time) { result = mid; lo = mid + 1; } else hi = mid - 1; } return result; }
         function seekToMeasure(direction) { if (isPlaying || !currentChart) return; const newMeasureIndex = Math.max(0, Math.min(currentChart.allMeasureTimes.length - 1, currentMeasureIndex + direction)); setChartTime(currentChart.allMeasureTimes[newMeasureIndex]); }
         function playMeasure() { 
+            if (playButton.disabled) return;
             if (!isLivePreviewEnabled && !isPlaying) applyEditorChange();
             if (isPlaying) { stopSimulation(); if (currentChart) { const newMeasureIndex = findMeasureIndex(currentElapsedTime); setChartTime(currentChart.allMeasureTimes[newMeasureIndex]); } } else { const newMeasureIndex = findMeasureIndex(currentElapsedTime); const targetTime = currentChart.allMeasureTimes[newMeasureIndex]; setChartTime(targetTime); currentElapsedTime = Math.max(0, targetTime - coolDownTime); chartCoolDownUntil = targetTime; seekChartState(currentElapsedTime); stopAtTime = null; startSimulation(); } 
         }
         function togglePlay() { 
+            if (playButton.disabled) return;
             tjaEditor.blur(); previewContainer.focus(); 
             if (!isLivePreviewEnabled && !isPlaying) applyEditorChange();
             if (isPlaying) { stopSimulation(); if (currentChart) { const newMeasureIndex = findMeasureIndex(currentElapsedTime); setChartTime(currentChart.allMeasureTimes[newMeasureIndex]); } } else { const targetTime = currentElapsedTime; setChartTime(targetTime); if (targetTime === 0) { chartCoolDownUntil = coolDownTime; currentElapsedTime = 0; } else { currentElapsedTime = Math.max(0, targetTime - coolDownTime); chartCoolDownUntil = targetTime; } seekChartState(currentElapsedTime); stopAtTime = null; startSimulation(); } 
@@ -1711,7 +1762,7 @@ BALLOON:10
                 const note = regularArr[i]; if (note.type === '0' || note.judgeResult !== 'pending' || (note.type >= '5' && note.type <= '7') || note.type === 'BARLINE') continue; 
                 const diff = note.time - elapsedTime; if (diff > JUDGE_BAD) break;
                 const absDiff = Math.abs(diff); if (absDiff > JUDGE_BAD) continue; 
-                const noteType = (note.type === '1' || note.type === '3') ? 'don' : 'ka'; if (noteType !== inputType) continue; 
+                const noteType = (note.type === '1' || note.type === '3') ? 'don':'ka'; if (noteType !== inputType) continue; 
                 if (absDiff < minDiff) { minDiff = absDiff; targetNote = note; } 
             } 
             if (targetNote) { 
